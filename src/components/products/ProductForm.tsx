@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { Close as CloseIcon } from '@mui/icons-material';
 import { supabase, Product, Category } from '../../lib/supabase';
@@ -35,6 +35,14 @@ interface ProductFormData {
   importing_company?: string;
   status: 'active' | 'discontinued' | 'out_of_stock';
   description?: string;
+  // Enhanced stock management fields
+  min_stock_level: number;
+  max_stock_level: number;
+  reorder_point: number;
+  reorder_quantity: number;
+  requires_batch_tracking: boolean;
+  shelf_life_days: number;
+  cost_method: 'fifo' | 'lifo' | 'weighted_average';
 }
 
 export function ProductForm({ product, categories, onClose, onSave }: ProductFormProps) {
@@ -60,11 +68,19 @@ export function ProductForm({ product, categories, onClose, onSave }: ProductFor
       fertilizer_type: (product as any).fertilizer_type || '',
       brand: product.brand || '',
       unit: product.unit,
-      cost_price: product.cost_price,
-      sale_price: product.sale_price,
+      cost_price: (product as any).cost_price || 0,
+      sale_price: (product as any).sale_price || 0,
       current_stock: product.current_stock,
-      minimum_stock: product.minimum_stock,
-      maximum_stock: product.maximum_stock || 0,
+      minimum_stock: (product as any).minimum_stock || 10,
+      maximum_stock: (product as any).maximum_stock || 0,
+      // Enhanced stock management fields
+      min_stock_level: (product as any).min_stock_level || 10,
+      max_stock_level: (product as any).max_stock_level || 1000,
+      reorder_point: (product as any).reorder_point || 20,
+      reorder_quantity: (product as any).reorder_quantity || 100,
+      requires_batch_tracking: (product as any).requires_batch_tracking ?? true,
+      shelf_life_days: (product as any).shelf_life_days || 365,
+      cost_method: (product as any).cost_method || 'weighted_average',
       batch_number: product.batch_number || '',
       expiry_date: product.expiry_date ? String(product.expiry_date).split('T')[0] : '',
       manufacturing_date: product.manufacturing_date ? String(product.manufacturing_date).split('T')[0] : '',
@@ -85,6 +101,14 @@ export function ProductForm({ product, categories, onClose, onSave }: ProductFor
       sale_price: 0,
       gst_rate: 5,
       cess_rate: 0,
+      // Enhanced stock management defaults
+      min_stock_level: 10,
+      max_stock_level: 1000,
+      reorder_point: 20,
+      reorder_quantity: 100,
+      requires_batch_tracking: true,
+      shelf_life_days: 365,
+      cost_method: 'weighted_average',
     }
   });
 
@@ -634,6 +658,115 @@ export function ProductForm({ product, categories, onClose, onSave }: ProductFor
                   <option value="discontinued">Discontinued</option>
                   <option value="out_of_stock">Out of Stock</option>
                 </select>
+              </div>
+            </div>
+          </div>
+
+          {/* Enhanced Stock Management */}
+          <div className="bg-blue-50 p-4 rounded-lg">
+            <h3 className="text-lg font-semibold text-gray-800 mb-4">Enhanced Stock Management</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div>
+                <label className="block text-sm font-semibold text-gray-800 mb-2">
+                  Reorder Point *
+                </label>
+                <input
+                  {...register('reorder_point', { 
+                    required: 'Reorder point is required',
+                    min: { value: 0, message: 'Reorder point cannot be negative' }
+                  })}
+                  type="number"
+                  className="w-full px-3 py-2 border-2 border-gray-600 bg-gray-50 rounded-md focus:outline-none focus:ring-2 focus:ring-green-600 focus:border-green-600 text-gray-900"
+                  placeholder="20"
+                />
+                {errors.reorder_point && (
+                  <p className="mt-1 text-sm text-red-600">{errors.reorder_point.message}</p>
+                )}
+                <p className="text-xs text-gray-500 mt-1">Alert when stock falls below this level</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-800 mb-2">
+                  Reorder Quantity *
+                </label>
+                <input
+                  {...register('reorder_quantity', { 
+                    required: 'Reorder quantity is required',
+                    min: { value: 1, message: 'Reorder quantity must be at least 1' }
+                  })}
+                  type="number"
+                  className="w-full px-3 py-2 border-2 border-gray-600 bg-gray-50 rounded-md focus:outline-none focus:ring-2 focus:ring-green-600 focus:border-green-600 text-gray-900"
+                  placeholder="100"
+                />
+                {errors.reorder_quantity && (
+                  <p className="mt-1 text-sm text-red-600">{errors.reorder_quantity.message}</p>
+                )}
+                <p className="text-xs text-gray-500 mt-1">Suggested quantity to reorder</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-800 mb-2">
+                  Max Stock Level
+                </label>
+                <input
+                  {...register('max_stock_level', {
+                    min: { value: 0, message: 'Max stock level cannot be negative' }
+                  })}
+                  type="number"
+                  className="w-full px-3 py-2 border-2 border-gray-600 bg-gray-50 rounded-md focus:outline-none focus:ring-2 focus:ring-green-600 focus:border-green-600 text-gray-900"
+                  placeholder="1000"
+                />
+                {errors.max_stock_level && (
+                  <p className="mt-1 text-sm text-red-600">{errors.max_stock_level.message}</p>
+                )}
+                <p className="text-xs text-gray-500 mt-1">Maximum stock capacity</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-800 mb-2">
+                  Cost Method
+                </label>
+                <select
+                  {...register('cost_method')}
+                  className="w-full px-3 py-2 border-2 border-gray-600 bg-gray-50 rounded-md focus:outline-none focus:ring-2 focus:ring-green-600 focus:border-green-600 text-gray-900"
+                >
+                  <option value="weighted_average">Weighted Average</option>
+                  <option value="fifo">FIFO (First In, First Out)</option>
+                  <option value="lifo">LIFO (Last In, First Out)</option>
+                </select>
+                <p className="text-xs text-gray-500 mt-1">Stock valuation method</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-800 mb-2">
+                  Shelf Life (Days)
+                </label>
+                <input
+                  {...register('shelf_life_days', {
+                    min: { value: 1, message: 'Shelf life must be at least 1 day' }
+                  })}
+                  type="number"
+                  className="w-full px-3 py-2 border-2 border-gray-600 bg-gray-50 rounded-md focus:outline-none focus:ring-2 focus:ring-green-600 focus:border-green-600 text-gray-900"
+                  placeholder="365"
+                />
+                {errors.shelf_life_days && (
+                  <p className="mt-1 text-sm text-red-600">{errors.shelf_life_days.message}</p>
+                )}
+                <p className="text-xs text-gray-500 mt-1">Default shelf life for new batches</p>
+              </div>
+
+              <div className="flex items-center">
+                <label className="flex items-center space-x-2 cursor-pointer">
+                  <input
+                    {...register('requires_batch_tracking')}
+                    type="checkbox"
+                    className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
+                  />
+                  <span className="text-sm font-semibold text-gray-800">
+                    Requires Batch Tracking
+                  </span>
+                </label>
+                <p className="text-xs text-gray-500 mt-1 ml-6">Enable batch/lot tracking for this product</p>
               </div>
             </div>
           </div>

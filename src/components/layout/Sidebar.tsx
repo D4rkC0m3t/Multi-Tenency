@@ -19,7 +19,8 @@ import {
   AdminPanelSettings as AdminIcon,
   Menu as MenuIcon,
   ChevronLeft as ChevronLeftIcon,
-
+  Warning as WarningIcon,
+  Science as ScienceIcon,
 } from '@mui/icons-material';
 import {
   Badge,
@@ -67,8 +68,10 @@ const groups: NavGroup[] = [
     items: [
       { name: 'Products', href: '/products', icon: <InventoryIcon fontSize="small" /> },
       { name: 'Categories', href: '/categories', icon: <FolderOpenIcon fontSize="small" /> },
+      { name: 'Batch Management', href: '/inventory/batches', icon: <ScienceIcon fontSize="small" /> },
       { name: 'Stock Movements', href: '/inventory/movements', icon: <InventoryIcon fontSize="small" /> },
       { name: 'Stock Take', href: '/inventory/stock-take', icon: <InventoryIcon fontSize="small" /> },
+      { name: 'Reorder Alerts', href: '/inventory/reorder-alerts', icon: <WarningIcon fontSize="small" /> },
     ],
   },
   {

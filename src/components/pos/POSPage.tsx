@@ -3,7 +3,7 @@ import {
   Box, Typography, Grid, Card, CardContent, CardMedia, Button, TextField, 
   Paper, IconButton, Divider, Dialog, DialogTitle, DialogContent, 
   DialogActions, FormControl, InputLabel, Select, MenuItem, Chip,
-  Stack, CircularProgress, Alert, Tooltip, DialogContentText
+  Stack, CircularProgress, Alert, DialogContentText
 } from '@mui/material';
 import { 
   Add as AddIcon, Remove as RemoveIcon, Delete as DeleteIcon,
@@ -15,14 +15,23 @@ import { supabase } from '../../lib/supabase';
 import { Product, Customer } from '../../lib/supabase';
 import { ExactEInvoiceData, ExactEInvoiceDocument } from '../../lib/exactFormatEInvoicePdf';
 import { pdf } from '@react-pdf/renderer';
-import EInvoiceManager from '../sales/EInvoiceManager';
+// import EInvoiceManager from '../sales/EInvoiceManager'; // Unused import
 import { InvoiceQRCode } from '../common/InvoiceQRCode';
+import { BatchSelectionDialog } from './BatchSelectionDialog';
+import DualCopyInvoice from './DualCopyInvoice';
+import { convertToWords } from '../../lib/numberToWords';
 import toast from 'react-hot-toast';
+
+interface BatchSelection {
+  batch_id: string;
+  quantity: number;
+}
 
 interface CartItem {
   product: Product;
   quantity: number;
-  paid?: boolean;
+  paymentStatus?: 'paid' | 'unpaid' | 'partial';
+  batchSelections?: BatchSelection[];
 }
 
 const POSPage = () => {
@@ -32,6 +41,9 @@ const POSPage = () => {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('');
+  const [stockFilter, setStockFilter] = useState('all');
+  const [sortBy, setSortBy] = useState('name');
   
   // Invoice & Checkout States
   const [showCheckoutDialog, setShowCheckoutDialog] = useState(false);
@@ -41,10 +53,16 @@ const POSPage = () => {
   const [processingCheckout, setProcessingCheckout] = useState(false);
   const [showQRCode, setShowQRCode] = useState(false);
   const [qrCodeData, setQrCodeData] = useState<any>(null);
+  const [lastSaleData, setLastSaleData] = useState<any>(null);
   const [discount, setDiscount] = useState<number>(0);
   const [discountType, setDiscountType] = useState<'percentage' | 'amount'>('percentage');
   const [customGstRate, setCustomGstRate] = useState<number>(18);
   const [heldSales, setHeldSales] = useState<any[]>([]);
+  
+  // Batch Selection States
+  const [showBatchDialog, setShowBatchDialog] = useState(false);
+  const [selectedProductForBatch, setSelectedProductForBatch] = useState<Product | null>(null);
+  const [requestedBatchQuantity, setRequestedBatchQuantity] = useState(0);
 
   // Fetch data
   useEffect(() => {
@@ -87,17 +105,60 @@ const POSPage = () => {
   };
 
   const addToCart = (product: Product, paid: boolean = false) => {
+    // Check if product has batch tracking enabled
+    const hasBatchTracking = (product as any).batch_tracking_enabled;
+    
+    if (hasBatchTracking) {
+      // Open batch selection dialog
+      setSelectedProductForBatch(product);
+      setRequestedBatchQuantity(1);
+      setShowBatchDialog(true);
+    } else {
+      // Add directly to cart without batch selection
+      const existingItem = cart.find(item => item.product.id === product.id);
+      
+      if (existingItem) {
+        setCart(prevCart =>
+          prevCart.map(item =>
+            item.product.id === product.id
+              ? { ...item, quantity: item.quantity + 1 }
+              : item
+          )
+        );
+      } else {
+        setCart(prevCart => [...prevCart, { product, quantity: 1, paymentStatus: 'unpaid' }]);
+      }
+    }
+  };
+
+  const handleBatchSelection = (selections: BatchSelection[]) => {
+    if (!selectedProductForBatch) return;
+    
     setCart(prevCart => {
-      const existingItem = prevCart.find(item => item.product.id === product.id);
+      const existingItem = prevCart.find(item => item.product.id === selectedProductForBatch.id);
       if (existingItem) {
         return prevCart.map(item =>
-          item.product.id === product.id
-            ? { ...item, quantity: item.quantity + 1, paid: paid || item.paid }
+          item.product.id === selectedProductForBatch.id
+            ? { 
+                ...item, 
+                quantity: item.quantity + requestedBatchQuantity,
+                batchSelections: [...(item.batchSelections || []), ...selections]
+              }
             : item
         );
       }
-      return [...prevCart, { product, quantity: 1, paid }];
+      return [...prevCart, { 
+        product: selectedProductForBatch, 
+        quantity: requestedBatchQuantity, 
+        paid: false,
+        batchSelections: selections
+      }];
     });
+    
+    // Reset batch selection state
+    setSelectedProductForBatch(null);
+    setRequestedBatchQuantity(0);
+    setShowBatchDialog(false);
   };
 
   const removeFromCart = (productId: string) => {
@@ -122,20 +183,41 @@ const POSPage = () => {
     );
   };
 
-  const togglePaymentStatus = (productId: string) => {
+  const updatePaymentStatus = (productId: string, status: 'paid' | 'unpaid' | 'partial') => {
     setCart(prevCart =>
       prevCart.map(item =>
         item.product.id === productId
-          ? { ...item, paid: !item.paid }
+          ? { ...item, paymentStatus: status }
           : item
       )
     );
   };
 
-  const filteredProducts = products.filter(product =>
-    product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    product.sku?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredProducts = products.filter(product => {
+    const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         (product.sku && product.sku.toLowerCase().includes(searchQuery.toLowerCase())) ||
+                         (product.category?.name && product.category.name.toLowerCase().includes(searchQuery.toLowerCase()));
+    
+    const matchesCategory = !categoryFilter || product.category?.name === categoryFilter;
+    
+    const matchesStock = stockFilter === 'all' ||
+                        (stockFilter === 'in_stock' && (product.current_stock || 0) > 0) ||
+                        (stockFilter === 'low_stock' && (product.current_stock || 0) <= (product.minimum_stock || 0) && (product.current_stock || 0) > 0) ||
+                        (stockFilter === 'out_of_stock' && (product.current_stock || 0) <= 0);
+    
+    return matchesSearch && matchesCategory && matchesStock;
+  }).sort((a, b) => {
+    switch (sortBy) {
+      case 'price_low':
+        return (a.sale_price || 0) - (b.sale_price || 0);
+      case 'price_high':
+        return (b.sale_price || 0) - (a.sale_price || 0);
+      case 'stock':
+        return (b.current_stock || 0) - (a.current_stock || 0);
+      default:
+        return a.name.localeCompare(b.name);
+    }
+  });
 
   // Calculate totals with discount and GST
   const subtotal = cart.reduce((sum, item) => sum + ((item.product.sale_price || 0) * item.quantity), 0);
@@ -320,6 +402,40 @@ const POSPage = () => {
 
       console.log('Stock updated successfully');
 
+      // Generate QR code for dual copy invoice
+      const qrCodeText = [
+        (merchant as any)?.gst_number || '',
+        customers.find(c => c.id === selectedCustomer)?.gstin || '',
+        sale.invoice_number,
+        new Date(sale.sale_date).toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' }),
+        total.toFixed(2),
+        '31054000', // HSN code for fertilizers
+        `IRN${Date.now()}${Math.random().toString(36).substr(2, 9).toUpperCase()}`
+      ].join('|');
+      
+      // Generate QR code image
+      const QRCode = (await import('qrcode')).default;
+      const qrCodeImage = await QRCode.toDataURL(qrCodeText, {
+        width: 200,
+        margin: 2,
+        color: {
+          dark: '#000000',
+          light: '#FFFFFF'
+        }
+      });
+
+      // Store sale data for dual copy invoice before clearing cart
+      const saleDataForInvoice = {
+        sale,
+        cartItems: [...cart],
+        customerData: customers.find(c => c.id === selectedCustomer),
+        totals: { subtotal, discountAmount, gstAmount, total },
+        gstRate: customGstRate,
+        paymentMethod,
+        qrCodeImage
+      };
+      setLastSaleData(saleDataForInvoice);
+
       // Generate and download invoice
       console.log('Generating invoice...');
       await generateInvoice(sale);
@@ -347,7 +463,7 @@ const POSPage = () => {
       date: sale.sale_date,
       total: sale.total_amount,
       gstin: (merchant as any)?.gst_number || '',
-      sellerName: merchant.business_name || merchant.name,
+      sellerName: merchant?.business_name || merchant?.name || '',
       upiId: (merchant as any)?.upi_id || 'krishisethu@upi' // Default UPI ID, should be configured in merchant settings
     };
   };
@@ -391,47 +507,71 @@ const POSPage = () => {
       const formatDateForQR = (date: Date | string) => {
         const d = new Date(date);
         const day = String(d.getDate()).padStart(2, '0');
-        const month = String(d.getDate() + 1).padStart(2, '0'); // getMonth() is zero-based
+        const month = String(d.getMonth() + 1).padStart(2, '0'); // getMonth() is zero-based
         const year = d.getFullYear();
-        return `${day}-${month}-${year}`;
+        return `${day}/${month}/${year}`;
       };
       
-      const qrData = generateQRCodeData(sale);
+      // const qrData = generateQRCodeData(sale);
       const invoiceDate = formatDateForQR(sale.sale_date);
-      const ackDate = formatDateForQR(new Date());
+      // const ackDate = formatDateForQR(new Date());
       
-      // Generate the QR code data string in the required format
+      // Generate QR code data as per India's e-Invoice GST specification (GSTN/NIC schema)
+      // Contains exactly 7 mandatory fields as per IRP system requirements
+      
+      // Find HSN code of highest value item (main item)
+      let mainItemHSN = '31054000'; // Default HSN for fertilizers
+      if (saleItems.length > 0) {
+        const highestValueItem = saleItems.reduce((prev, current) => 
+          (current.total_price > prev.total_price) ? current : prev
+        );
+        mainItemHSN = (highestValueItem.product as any).hsn_code || '31054000';
+      }
+      
+      // Generate IRN (normally this would come from IRP after registration)
+      const irn = `IRN${Date.now()}${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
+      
       const qrCodeText = [
-        (merchant as any).gst_number || '', // Seller GSTIN
-        (customer as any)?.gst_number || '', // Buyer GSTIN
-        sale.invoice_number, // Invoice number
-        invoiceDate, // Invoice date
-        sale.total_amount.toFixed(2), // Invoice value
-        `IRN${Date.now()}`, // IRN (Invoice Reference Number)
-        `ACK${Date.now()}`, // ACK Number
-        ackDate // ACK Date
+        (merchant as any).gst_number || '', // 1. Supplier GSTIN
+        (customer as any)?.gst_number || '', // 2. Recipient GSTIN  
+        sale.invoice_number, // 3. Invoice Number (as given by supplier)
+        invoiceDate, // 4. Invoice Date (DD/MM/YYYY format)
+        sale.total_amount.toFixed(2), // 5. Invoice Value (total including taxes)
+        mainItemHSN, // 6. HSN Code of Main Item (highest value item)
+        irn // 7. IRN (Invoice Reference Number - 64-char hash from IRP)
       ].join('|');
+
+      // Generate actual QR code image as base64
+      const QRCode = (await import('qrcode')).default;
+      const qrCodeBase64 = await QRCode.toDataURL(qrCodeText, {
+        width: 200,
+        margin: 2,
+        color: {
+          dark: '#000000',
+          light: '#ffffff'
+        }
+      });
 
       const invoiceData: ExactEInvoiceData = {
         // E-Invoice Header
         ackNo: `ACK${Date.now()}`,
         ackDate: new Date().toLocaleDateString('en-IN'),
         irn: `IRN${Date.now()}${Math.random().toString(36).substr(2, 9)}`,
-        signedQRCode: qrCodeText,
+        signedQRCode: qrCodeBase64,
         
         // Company Details
-        companyName: merchant.business_name || merchant.name,
-        companyAddress: [merchant.address || ''],
-        gstin: (merchant as any).gst_number || '',
-        stateName: merchant.state || '',
+        companyName: merchant?.business_name || merchant?.name || '',
+        companyAddress: [merchant?.address || ''],
+        gstin: (merchant as any)?.gst_number || '',
+        stateName: merchant?.state || '',
         stateCode: '27', // Default to Maharashtra, should be dynamic
-        mobile: merchant.phone || '',
-        email: merchant.email || '',
+        mobile: merchant?.phone || '',
+        email: merchant?.email || '',
         
         // Fertilizer Licensing Details
-        fertilizerLicense: merchant.fertilizer_license || '',
-        seedLicense: merchant.seed_license || '',
-        pesticideLicense: merchant.pesticide_license || '',
+        fertilizerLicense: (merchant as any)?.fertilizer_license || '',
+        seedLicense: (merchant as any)?.seed_license || '',
+        pesticideLicense: (merchant as any)?.pesticide_license || '',
         
         // Invoice Details
         invoiceNo: sale.invoice_number,
@@ -442,7 +582,7 @@ const POSPage = () => {
         buyerName: customer?.name || 'Walk-in Customer',
         buyerAddress: [customer?.address || ''],
         buyerGstin: (customer as any)?.gst_number || '',
-        buyerStateName: customer?.state || merchant.state || '',
+        buyerStateName: customer?.state || merchant?.state || '',
         buyerStateCode: '27', // Should be dynamic based on buyer state
         buyerMobile: customer?.phone || '',
         
@@ -492,7 +632,7 @@ const POSPage = () => {
         branchIfsc: 'SBIN0001234',
         
         // Footer
-        jurisdiction: merchant.state || 'Maharashtra'
+        jurisdiction: merchant?.state || 'Maharashtra'
       };
 
       console.log('Invoice data prepared:', invoiceData);
@@ -552,25 +692,100 @@ const POSPage = () => {
         {/* Products Section */}
         <Grid item xs={12} md={8}>
           <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid #e2e8f0' }}>
-            <TextField
-              fullWidth
-              placeholder="🔍 Search products by name, SKU, or category..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              sx={{ 
-                mb: 3,
-                '& .MuiOutlinedInput-root': {
-                  borderRadius: 2,
-                  backgroundColor: '#f8fafc',
-                  '&:hover': {
-                    backgroundColor: '#f1f5f9'
-                  },
-                  '&.Mui-focused': {
-                    backgroundColor: '#ffffff'
+            {/* Search and Filters */}
+            <Box sx={{ mb: 3 }}>
+              <TextField
+                fullWidth
+                placeholder="🔍 Search products by name, SKU, or category..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                sx={{ 
+                  mb: 2,
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: 3,
+                    backgroundColor: '#f8fafc',
+                    fontSize: '0.95rem',
+                    '&:hover': {
+                      backgroundColor: '#f1f5f9'
+                    },
+                    '&.Mui-focused': {
+                      backgroundColor: '#ffffff',
+                      boxShadow: '0 0 0 3px rgba(59, 130, 246, 0.1)'
+                    }
                   }
-                }
-              }}
-            />
+                }}
+              />
+              
+              {/* Filter Row */}
+              <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
+                <FormControl size="small" sx={{ minWidth: 120 }}>
+                  <InputLabel>Category</InputLabel>
+                  <Select
+                    value={categoryFilter}
+                    onChange={(e) => setCategoryFilter(e.target.value)}
+                    label="Category"
+                    sx={{
+                      borderRadius: 2,
+                      backgroundColor: '#f8fafc',
+                      '& .MuiOutlinedInput-notchedOutline': {
+                        borderColor: '#e2e8f0'
+                      }
+                    }}
+                  >
+                    <MenuItem value="">All Categories</MenuItem>
+                    {[...new Set(products.map(p => p.category?.name).filter(Boolean))].map((category) => (
+                      <MenuItem key={category} value={category}>{category}</MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+                
+                <FormControl size="small" sx={{ minWidth: 120 }}>
+                  <InputLabel>Stock</InputLabel>
+                  <Select
+                    value={stockFilter}
+                    onChange={(e) => setStockFilter(e.target.value)}
+                    label="Stock"
+                    sx={{
+                      borderRadius: 2,
+                      backgroundColor: '#f8fafc',
+                      '& .MuiOutlinedInput-notchedOutline': {
+                        borderColor: '#e2e8f0'
+                      }
+                    }}
+                  >
+                    <MenuItem value="all">All Stock</MenuItem>
+                    <MenuItem value="in_stock">✅ In Stock</MenuItem>
+                    <MenuItem value="low_stock">⚠️ Low Stock</MenuItem>
+                    <MenuItem value="out_of_stock">❌ Out of Stock</MenuItem>
+                  </Select>
+                </FormControl>
+                
+                <FormControl size="small" sx={{ minWidth: 140 }}>
+                  <InputLabel>Sort By</InputLabel>
+                  <Select
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value)}
+                    label="Sort By"
+                    sx={{
+                      borderRadius: 2,
+                      backgroundColor: '#f8fafc',
+                      '& .MuiOutlinedInput-notchedOutline': {
+                        borderColor: '#e2e8f0'
+                      }
+                    }}
+                  >
+                    <MenuItem value="name">Name A→Z</MenuItem>
+                    <MenuItem value="price_low">Price Low→High</MenuItem>
+                    <MenuItem value="price_high">Price High→Low</MenuItem>
+                    <MenuItem value="stock">Stock High→Low</MenuItem>
+                  </Select>
+                </FormControl>
+                
+                <Typography variant="body2" sx={{ color: '#64748b', ml: 'auto' }}>
+                  {filteredProducts.length} products found
+                </Typography>
+              </Box>
+            </Box>
           
             <Grid container spacing={2} sx={{ alignItems: 'stretch' }}>
               {filteredProducts.map((product) => {
@@ -761,38 +976,103 @@ const POSPage = () => {
                         </Typography>
                       </Box>
                       
-                        <Button
-                          variant="contained"
-                          fullWidth
-                          size="small"
-                          sx={{ 
-                            fontSize: '0.75rem', 
-                            py: 1, 
-                            height: '36px',
-                            minHeight: '36px',
-                            maxHeight: '36px',
-                            borderRadius: 2,
-                            textTransform: 'none',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap',
-                            flexShrink: 0,
-                            fontWeight: 600,
-                            backgroundColor: product.current_stock <= 0 ? '#94a3b8' : '#3b82f6',
-                            '&:hover': {
-                              backgroundColor: product.current_stock <= 0 ? '#94a3b8' : '#2563eb'
-                            },
-                            '&:disabled': {
-                              backgroundColor: '#94a3b8',
-                              color: '#ffffff'
-                            }
-                          }}
-                          onClick={() => addToCart(product)}
-                          disabled={product.current_stock <= 0}
-                          startIcon={<AddIcon sx={{ fontSize: 16 }} />}
-                        >
-                          {product.current_stock <= 0 ? '🚫 Out of Stock' : `➕ ADD ₹${product.sale_price || 0}`}
-                        </Button>
+                        {/* Quantity Controls or Add Button */}
+                        {cart.find(item => item.product.id === product.id) ? (
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, height: '36px' }}>
+                            <IconButton 
+                              size="small" 
+                              onClick={() => {
+                                const cartItem = cart.find(item => item.product.id === product.id);
+                                if (cartItem) updateQuantity(product.id, cartItem.quantity - 1);
+                              }}
+                              sx={{ 
+                                backgroundColor: '#f1f5f9',
+                                width: '28px',
+                                height: '28px',
+                                '&:hover': { backgroundColor: '#e2e8f0' }
+                              }}
+                            >
+                              <RemoveIcon sx={{ fontSize: 14 }} />
+                            </IconButton>
+                            <Typography 
+                              sx={{ 
+                                minWidth: '32px', 
+                                textAlign: 'center',
+                                fontWeight: 700,
+                                backgroundColor: '#dbeafe',
+                                px: 1,
+                                py: 0.5,
+                                borderRadius: 1,
+                                border: '2px solid #3b82f6',
+                                fontSize: '0.85rem',
+                                color: '#1d4ed8'
+                              }}
+                            >
+                              {cart.find(item => item.product.id === product.id)?.quantity || 0}
+                            </Typography>
+                            <IconButton 
+                              size="small" 
+                              onClick={() => {
+                                const cartItem = cart.find(item => item.product.id === product.id);
+                                if (cartItem) updateQuantity(product.id, cartItem.quantity + 1);
+                              }}
+                              sx={{ 
+                                backgroundColor: '#f1f5f9',
+                                width: '28px',
+                                height: '28px',
+                                '&:hover': { backgroundColor: '#e2e8f0' }
+                              }}
+                            >
+                              <AddIcon sx={{ fontSize: 14 }} />
+                            </IconButton>
+                            <IconButton 
+                              size="small" 
+                              onClick={() => removeFromCart(product.id)}
+                              sx={{ 
+                                ml: 0.5,
+                                backgroundColor: '#fef2f2',
+                                color: '#dc2626',
+                                width: '28px',
+                                height: '28px',
+                                '&:hover': { backgroundColor: '#fee2e2' }
+                              }}
+                            >
+                              <DeleteIcon sx={{ fontSize: 14 }} />
+                            </IconButton>
+                          </Box>
+                        ) : (
+                          <Button
+                            variant="contained"
+                            fullWidth
+                            size="small"
+                            sx={{ 
+                              fontSize: '0.75rem', 
+                              py: 1, 
+                              height: '36px',
+                              minHeight: '36px',
+                              maxHeight: '36px',
+                              borderRadius: 2,
+                              textTransform: 'none',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                              flexShrink: 0,
+                              fontWeight: 600,
+                              backgroundColor: product.current_stock <= 0 ? '#94a3b8' : '#059669',
+                              '&:hover': {
+                                backgroundColor: product.current_stock <= 0 ? '#94a3b8' : '#047857'
+                              },
+                              '&:disabled': {
+                                backgroundColor: '#94a3b8',
+                                color: '#ffffff'
+                              }
+                            }}
+                            onClick={() => addToCart(product)}
+                            disabled={product.current_stock <= 0}
+                          >
+                            {product.current_stock <= 0 ? '🚫 Out of Stock' : `₹${product.sale_price || 0}`}
+                          </Button>
+                        )}
                     </CardContent>
                   </Card>
                 </Grid>
@@ -933,27 +1213,39 @@ const POSPage = () => {
                       p: 2, 
                       borderRadius: 2,
                       border: '1px solid #e2e8f0',
-                      backgroundColor: item.paid ? '#f0fdf4' : '#ffffff',
+                      backgroundColor: item.paymentStatus === 'paid' ? '#f0fdf4' : item.paymentStatus === 'partial' ? '#fffbeb' : '#ffffff',
                       position: 'relative',
                       overflow: 'visible',
                       '&:hover': {
                         boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
                       }
                     }}>
-                      <Chip 
-                        label={item.paid ? 'Paid' : 'Unpaid'} 
-                        size="small" 
-                        color={item.paid ? 'success' : 'default'}
-                        sx={{
-                          position: 'absolute',
-                          top: -8,
-                          right: 12,
-                          fontWeight: 600,
-                          fontSize: '0.7rem',
-                          textTransform: 'uppercase',
-                          letterSpacing: '0.5px'
-                        }}
-                      />
+                      <Box display="flex" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 2 }}>
+                        <FormControl size="small" sx={{ minWidth: 100 }}>
+                          <Select
+                            value={item.paymentStatus || 'unpaid'}
+                            onChange={(e) => updatePaymentStatus(item.product.id, e.target.value as 'paid' | 'unpaid' | 'partial')}
+                            sx={{
+                              fontSize: '0.75rem',
+                              fontWeight: 600,
+                              backgroundColor: item.paymentStatus === 'paid' ? '#dcfce7' : item.paymentStatus === 'partial' ? '#fef3c7' : '#f8fafc',
+                              border: `1px solid ${item.paymentStatus === 'paid' ? '#22c55e' : item.paymentStatus === 'partial' ? '#f59e0b' : '#e2e8f0'}`,
+                              borderRadius: 1,
+                              '& .MuiSelect-select': {
+                                py: 0.5,
+                                px: 1
+                              },
+                              '& .MuiOutlinedInput-notchedOutline': {
+                                border: 'none'
+                              }
+                            }}
+                          >
+                            <MenuItem value="unpaid" sx={{ fontSize: '0.75rem' }}>❌ Unpaid</MenuItem>
+                            <MenuItem value="partial" sx={{ fontSize: '0.75rem' }}>⚠️ Partial</MenuItem>
+                            <MenuItem value="paid" sx={{ fontSize: '0.75rem' }}>✅ Paid</MenuItem>
+                          </Select>
+                        </FormControl>
+                      </Box>
                       <Box display="flex" justifyContent="space-between" alignItems="flex-start">
                         <Box sx={{ flex: 1, mr: 2 }}>
                           <Typography variant="body2" fontWeight="600" sx={{ mb: 0.5, color: '#1e293b' }}>
@@ -978,19 +1270,19 @@ const POSPage = () => {
                             <RemoveIcon sx={{ fontSize: 16 }} />
                           </IconButton>
                           <Typography 
-                            onClick={() => togglePaymentStatus(item.product.id)}
+                            onClick={() => updatePaymentStatus(item.product.id, item.paymentStatus === 'paid' ? 'unpaid' : 'paid')}
                             sx={{ 
                               minWidth: '32px', 
                               textAlign: 'center',
                               fontWeight: 600,
-                              backgroundColor: item.paid ? '#dcfce7' : '#f8fafc',
+                              backgroundColor: item.paymentStatus === 'paid' ? '#dcfce7' : item.paymentStatus === 'partial' ? '#fef3c7' : '#f8fafc',
                               px: 1,
                               py: 0.5,
                               borderRadius: 1,
-                              border: `1px solid ${item.paid ? '#22c55e' : '#e2e8f0'}`,
+                              border: `1px solid ${item.paymentStatus === 'paid' ? '#22c55e' : item.paymentStatus === 'partial' ? '#f59e0b' : '#e2e8f0'}`,
                               cursor: 'pointer',
                               '&:hover': {
-                                backgroundColor: item.paid ? '#bbf7d0' : '#f1f5f9'
+                                backgroundColor: item.paymentStatus === 'paid' ? '#bbf7d0' : item.paymentStatus === 'partial' ? '#fde68a' : '#f1f5f9'
                               }
                             }}
                           >
@@ -1263,16 +1555,96 @@ const POSPage = () => {
             variant="contained" 
             color="primary"
             onClick={() => {
-              const link = document.createElement('a');
-              link.href = URL.createObjectURL(blob);
-              link.download = `invoice_${qrCodeData?.number || 'receipt'}.pdf`;
-              link.click();
+              // PDF download functionality to be implemented
+              console.log('Download invoice:', qrCodeData?.number);
             }}
+            sx={{ mr: 1 }}
           >
             Download Invoice
           </Button>
+          <Button 
+            variant="outlined" 
+            color="primary"
+            onClick={async () => {
+              if (!qrCodeData) return;
+              
+              try {
+                // Use stored sale data instead of current cart (which is empty)
+                if (!lastSaleData) {
+                  toast.error('No sale data available for invoice generation');
+                  return;
+                }
+                
+                const { cartItems, customerData, totals, gstRate, paymentMethod: salePaymentMethod, qrCodeImage } = lastSaleData;
+                
+                // Prepare invoice data
+                const invoiceData = {
+                  companyName: merchant?.business_name || merchant?.name || 'Business Name',
+                  companyAddress: merchant?.address || 'Business Address',
+                  companyGSTIN: (merchant as any)?.gst_number || merchant?.gstin || 'GSTIN Not Available',
+                  invoiceNumber: qrCodeData.number,
+                  invoiceDate: new Date(qrCodeData.date).toLocaleDateString('en-IN'),
+                  customerName: customerData?.name || 'Walk-in Customer',
+                  customerAddress: customerData?.address || '',
+                  customerGSTIN: customerData?.gstin,
+                  items: cartItems.map((item, index) => ({
+                    sno: index + 1,
+                    description: item.product.name,
+                    hsn: item.product.hsn_code || '31054000',
+                    batch: item.product.batch_number || 'N/A',
+                    expiry: item.product.expiry_date || 'N/A',
+                    qty: item.quantity,
+                    unit: item.product.unit || 'Kg',
+                    rate: item.product.sale_price || 0,
+                    amount: (item.product.sale_price || 0) * item.quantity,
+                    taxable: (item.product.sale_price || 0) * item.quantity,
+                    cgst: ((item.product.sale_price || 0) * item.quantity * gstRate) / 200,
+                    sgst: ((item.product.sale_price || 0) * item.quantity * gstRate) / 200,
+                    igst: 0,
+                    total: ((item.product.sale_price || 0) * item.quantity) * (1 + gstRate / 100)
+                  })),
+                  totalAmount: totals.total,
+                  amountInWords: convertToWords(totals.total),
+                  paymentMethod: salePaymentMethod,
+                  qrCodeData: qrCodeImage
+                };
+                
+                // Generate PDF with timestamp to avoid caching
+                const timestamp = Date.now();
+                const blob = await pdf(<DualCopyInvoice {...invoiceData} key={timestamp} />).toBlob();
+                
+                // Download PDF
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = `dual_copy_invoice_${qrCodeData.number}_${timestamp}.pdf`;
+                link.click();
+                
+                toast.success('Dual copy invoice generated successfully!');
+              } catch (error) {
+                console.error('Error generating dual copy invoice:', error);
+                toast.error('Failed to generate dual copy invoice');
+              }
+            }}     >
+            Dual Copy Invoice
+          </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Batch Selection Dialog */}
+      {selectedProductForBatch && (
+        <BatchSelectionDialog
+          open={showBatchDialog}
+          onClose={() => {
+            setShowBatchDialog(false);
+            setSelectedProductForBatch(null);
+            setRequestedBatchQuantity(0);
+          }}
+          productId={selectedProductForBatch.id}
+          productName={selectedProductForBatch.name}
+          requestedQuantity={requestedBatchQuantity}
+          onConfirm={handleBatchSelection}
+        />
+      )}
     </Box>
   );
 };

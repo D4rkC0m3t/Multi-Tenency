@@ -151,8 +151,8 @@ DECLARE v_merchant uuid; v_po uuid;
 BEGIN
   SELECT g.merchant_id, g.purchase_order_id INTO v_merchant, v_po FROM public.grns g WHERE g.id = NEW.grn_id;
   IF v_merchant IS NULL THEN RETURN NEW; END IF;
-  INSERT INTO public.stock_movements (merchant_id, product_id, transaction_type, transaction_id, quantity_change, note)
-  VALUES (v_merchant, NEW.product_id, 'purchase', COALESCE(v_po, NEW.grn_id), COALESCE(NEW.quantity_received,0), 'GRN receipt');
+  INSERT INTO public.stock_movements (merchant_id, product_id, transaction_type, transaction_id, quantity_change)
+  VALUES (v_merchant, NEW.product_id, 'purchase', COALESCE(v_po, NEW.grn_id), COALESCE(NEW.quantity_received,0));
   RETURN NEW;
 END $$;
 

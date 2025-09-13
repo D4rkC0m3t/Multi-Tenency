@@ -907,7 +907,6 @@ export function PurchasesPage() {
                     transaction_type: 'purchase_return',
                     transaction_id: returningPurchase.id,
                     quantity_change: -qty,
-                    note: 'Purchase return',
                     created_at: new Date().toISOString(),
                   };
                   

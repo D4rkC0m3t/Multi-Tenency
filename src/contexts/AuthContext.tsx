@@ -131,7 +131,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signUp = async (email: string, password: string, fullName: string) => {
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -146,7 +146,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       throw error;
     }
 
-    toast.success('Check your email for the confirmation link!');
+    // Check if email confirmation is required
+    if (data.user && !data.session) {
+      toast.success('Check your email for the confirmation link!');
+    } else if (data.session) {
+      toast.success('Account created successfully! Welcome!');
+    }
   };
 
   const signOut = async () => {

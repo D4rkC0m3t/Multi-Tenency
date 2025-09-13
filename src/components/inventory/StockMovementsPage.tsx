@@ -35,9 +35,8 @@ interface MovementRow {
   merchant_id: string;
   product_id: string;
   transaction_type: 'sale' | 'purchase' | 'adjustment';
-  transaction_id: string | null;
+  transaction_id: string;
   quantity_change: number;
-  note?: string | null;
   product?: { id: string; name: string; sku?: string | null; unit?: string | null };
 }
 
@@ -67,7 +66,7 @@ export function StockMovementsPage() {
     try {
       const { data, error } = await supabase
         .from('stock_movements')
-        .select('id, created_at, merchant_id, product_id, transaction_type, transaction_id, quantity_change, note, product:products(id, name, sku, unit)')
+        .select('id, created_at, merchant_id, product_id, transaction_type, transaction_id, quantity_change, product:products(id, name, sku, unit)')
         .eq('merchant_id', merchant.id)
         .order('created_at', { ascending: false })
         .limit(1000);
@@ -111,7 +110,7 @@ export function StockMovementsPage() {
   const [adjOpen, setAdjOpen] = useState(false);
   const [adjProduct, setAdjProduct] = useState<string>('');
   const [adjQty, setAdjQty] = useState<string>('');
-  const [adjNote, setAdjNote] = useState<string>('');
+
   const [savingAdj, setSavingAdj] = useState(false);
 
   const saveAdjustment = async () => {
@@ -125,9 +124,8 @@ export function StockMovementsPage() {
         merchant_id: merchant.id,
         product_id: adjProduct,
         transaction_type: 'adjustment',
-        transaction_id: null,
+        transaction_id: crypto.randomUUID(), // Generate unique ID for manual adjustment
         quantity_change: qty,
-        note: adjNote || null,
         created_at: new Date().toISOString(),
       };
       const { error } = await supabase.from('stock_movements').insert([payload]);
@@ -136,7 +134,7 @@ export function StockMovementsPage() {
       setAdjOpen(false);
       setAdjProduct('');
       setAdjQty('');
-      setAdjNote('');
+
       fetchMovements();
     } catch (e: any) {
       console.error('Adjustment save failed:', e);
@@ -267,14 +265,7 @@ export function StockMovementsPage() {
               onChange={(e)=>setAdjQty(e.target.value)}
               fullWidth
             />
-            <TextField
-              label="Note (optional)"
-              value={adjNote}
-              onChange={(e)=>setAdjNote(e.target.value)}
-              fullWidth
-              multiline
-              minRows={2}
-            />
+
           </Stack>
         </DialogContent>
         <DialogActions>

@@ -227,6 +227,35 @@ export function PurchaseForm({ purchase, onClose, onSave }: PurchaseFormProps) {
 
         if (itemsError) throw itemsError;
 
+        // Create product batches for items with batch information
+        const batchesToCreate = data.purchase_items
+          .filter(item => item.batch_number && item.batch_number.trim() !== '')
+          .map(item => ({
+            merchant_id: merchant!.id,
+            product_id: item.product_id,
+            batch_number: item.batch_number,
+            manufacturing_date: data.purchase_date,
+            expiry_date: item.expiry_date || null,
+            initial_stock: Number(item.quantity),
+            current_stock: Number(item.quantity),
+            reserved_stock: 0,
+            supplier_id: data.supplier_id,
+            purchase_price: Number(item.unit_price),
+            is_active: true,
+            created_at: new Date().toISOString()
+          }));
+
+        if (batchesToCreate.length > 0) {
+          const { error: batchError } = await supabase
+            .from('product_batches')
+            .insert(batchesToCreate);
+
+          if (batchError) {
+            console.warn('Failed to create some batches:', batchError);
+            // Don't fail the entire purchase for batch creation errors
+          }
+        }
+
         toast.success('Purchase created successfully! Stock has been updated.');
         onSave();
       }
@@ -296,7 +325,7 @@ export function PurchaseForm({ purchase, onClose, onSave }: PurchaseFormProps) {
                             value={products.find(p => p.id === value) || null}
                             onChange={(_, newValue) => {
                               onChange(newValue?.id || '');
-                              setValue(`purchase_items.${index}.unit_price`, newValue?.cost_price || 0);
+                              setValue(`purchase_items.${index}.unit_price`, (newValue as any)?.cost_price || 0);
                             }}
                             renderInput={(params) => <TextField {...params} variant="standard" placeholder="Select Product" />}
                           />

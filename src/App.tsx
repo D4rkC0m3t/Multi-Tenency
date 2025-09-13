@@ -19,6 +19,8 @@ import { SettingsPage } from './components/settings/SettingsPage';
 import POSPage from './components/pos/POSPage';
 import { StockMovementsPage } from './components/inventory/StockMovementsPage';
 import { StockTakePage } from './components/inventory/StockTakePage';
+import { BatchManagementPage } from './components/inventory/BatchManagementPage';
+import { ReorderAlertsPage } from './components/inventory/ReorderAlertsPage';
 import { EInvoicePage } from './components/einvoice/EInvoicePage';
 
 
@@ -81,6 +83,8 @@ function AppContent() {
             <Route path="purchases/orders" element={<PurchaseOrdersPage />} />
             <Route path="inventory/movements" element={<StockMovementsPage />} />
             <Route path="inventory/stock-take" element={<StockTakePage />} />
+            <Route path="inventory/batches" element={<BatchManagementPage />} />
+            <Route path="inventory/reorder-alerts" element={<ReorderAlertsPage />} />
             <Route path="einvoice" element={<EInvoicePage />} />
             <Route path="reports" element={<ReportsPage />} />
             <Route path="notifications" element={<NotificationsPage />} />

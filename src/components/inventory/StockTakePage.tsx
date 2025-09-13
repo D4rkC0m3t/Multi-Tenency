@@ -101,13 +101,14 @@ export function StockTakePage() {
     }
     try {
       setSaving(true);
+      // Generate a unique transaction ID for this stock take batch
+      const stockTakeTransactionId = crypto.randomUUID();
       const rows = deltas.map(r => ({
         merchant_id: merchant.id,
         product_id: r.id,
         transaction_type: 'adjustment',
-        transaction_id: null,
+        transaction_id: stockTakeTransactionId,
         quantity_change: r.delta,
-        note: 'Stock take adjustment',
         created_at: new Date().toISOString(),
       }));
       const { error } = await supabase.from('stock_movements').insert(rows as any);

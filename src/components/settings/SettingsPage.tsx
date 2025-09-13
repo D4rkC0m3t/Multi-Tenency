@@ -156,7 +156,27 @@ export function SettingsPage() {
         ifsc_code: newBiz.ifsc_code.trim() || null,
         upi_id: newBiz.upi_id.trim() || null,
         is_active: true,
-        settings: {},
+        settings: {
+          features: {
+            logo_upload: true,
+            invoice_customization: true,
+            advanced_reporting: true,
+            multi_location: true,
+            api_access: true
+          },
+          preferences: {
+            dark_mode: false,
+            compact_view: false,
+            auto_backup: true,
+            email_notifications: true
+          },
+          limits: {
+            max_products: 10000,
+            max_customers: 5000,
+            max_invoices_per_month: 1000,
+            storage_mb: 1000
+          }
+        },
         created_at: now,
         updated_at: now,
         owner_id: user.id,
