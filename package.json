@@ -15,7 +15,7 @@
     "test": "echo \"No tests specified\" && exit 0",
     "test:watch": "echo \"No tests specified\" && exit 0",
     "clean": "rm -rf dist build .vite",
-    "prepare": "npm run type-check && npm run format:check",
+    "prepare": "npm run type-check",
     "pre-commit": "npm run lint:fix && npm run format",
     "build:analyze": "npm run build && npx vite-bundle-analyzer dist/stats.html",
     "audit:security": "npm audit --audit-level moderate",

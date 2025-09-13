@@ -1,6 +1,15 @@
 import { supabase } from './supabase';
+import type { Sale, Purchase } from '../types';
 
 export type TimeRange = '7d' | '30d' | '90d' | '1y';
+
+interface RecentSale extends Pick<Sale, 'id' | 'invoice_number' | 'sale_date' | 'total_amount' | 'payment_status'> {
+  customers: { id: string; name: string } | null;
+}
+
+interface RecentPurchase extends Pick<Purchase, 'id' | 'invoice_number' | 'purchase_date' | 'total_amount' | 'payment_status'> {
+  suppliers: { id: string; name: string } | null;
+}
 
 interface DashboardMetrics {
   totalSales: number;
@@ -9,8 +18,8 @@ interface DashboardMetrics {
   lowStockItems: number;
   salesTrend: { date: string; amount: number }[];
   stockByCategory: { name: string; value: number }[];
-  recentSales: any[];
-  recentPurchases: any[];
+  recentSales: RecentSale[];
+  recentPurchases: RecentPurchase[];
 }
 
 export const fetchDashboardData = async (merchantId: string, range: TimeRange = '30d'): Promise<DashboardMetrics> => {
