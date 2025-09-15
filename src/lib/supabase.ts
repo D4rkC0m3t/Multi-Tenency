@@ -108,24 +108,33 @@ export interface Category {
 }
 
 export interface Customer {
+  // Core fields
   id: string;
   merchant_id: string;
   name: string;
   customer_type: string;
+  
+  // Contact information
   phone?: string;
   email?: string;
   address?: string;
+  
+  // Location information
   village?: string;
   district?: string;
   state?: string;
   state_code?: string;
   pin_code?: string;
   pincode?: string; // Legacy field
+  
+  // Business information
+  gstin?: string;
   gst_number?: string;
   credit_limit: number;
   outstanding_balance: number;
+  
+  // System fields
   is_active: boolean;
-  notes?: string;
   created_at: string;
   updated_at: string;
 }

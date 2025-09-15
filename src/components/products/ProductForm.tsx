@@ -35,14 +35,6 @@ interface ProductFormData {
   importing_company?: string;
   status: 'active' | 'discontinued' | 'out_of_stock';
   description?: string;
-  // Enhanced stock management fields
-  min_stock_level: number;
-  max_stock_level: number;
-  reorder_point: number;
-  reorder_quantity: number;
-  requires_batch_tracking: boolean;
-  shelf_life_days: number;
-  cost_method: 'fifo' | 'lifo' | 'weighted_average';
 }
 
 export function ProductForm({ product, categories, onClose, onSave }: ProductFormProps) {
@@ -73,14 +65,6 @@ export function ProductForm({ product, categories, onClose, onSave }: ProductFor
       current_stock: product.current_stock,
       minimum_stock: (product as any).minimum_stock || 10,
       maximum_stock: (product as any).maximum_stock || 0,
-      // Enhanced stock management fields
-      min_stock_level: (product as any).min_stock_level || 10,
-      max_stock_level: (product as any).max_stock_level || 1000,
-      reorder_point: (product as any).reorder_point || 20,
-      reorder_quantity: (product as any).reorder_quantity || 100,
-      requires_batch_tracking: (product as any).requires_batch_tracking ?? true,
-      shelf_life_days: (product as any).shelf_life_days || 365,
-      cost_method: (product as any).cost_method || 'weighted_average',
       batch_number: product.batch_number || '',
       expiry_date: product.expiry_date ? String(product.expiry_date).split('T')[0] : '',
       manufacturing_date: product.manufacturing_date ? String(product.manufacturing_date).split('T')[0] : '',
@@ -101,14 +85,6 @@ export function ProductForm({ product, categories, onClose, onSave }: ProductFor
       sale_price: 0,
       gst_rate: 5,
       cess_rate: 0,
-      // Enhanced stock management defaults
-      min_stock_level: 10,
-      max_stock_level: 1000,
-      reorder_point: 20,
-      reorder_quantity: 100,
-      requires_batch_tracking: true,
-      shelf_life_days: 365,
-      cost_method: 'weighted_average',
     }
   });
 
@@ -344,7 +320,12 @@ export function ProductForm({ product, categories, onClose, onSave }: ProductFor
           <h2 className="text-xl font-semibold text-gray-900">
             {product ? 'Edit Product' : 'Add New Product'}
           </h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+          <button 
+            type="button"
+            onClick={onClose} 
+            className="text-gray-400 hover:text-gray-600"
+            aria-label="Close"
+          >
             <CloseIcon className="h-6 w-6" />
           </button>
         </div>
@@ -662,160 +643,64 @@ export function ProductForm({ product, categories, onClose, onSave }: ProductFor
             </div>
           </div>
 
-          {/* Enhanced Stock Management */}
-          <div className="bg-blue-50 p-4 rounded-lg">
-            <h3 className="text-lg font-semibold text-gray-800 mb-4">Enhanced Stock Management</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div>
-                <label className="block text-sm font-semibold text-gray-800 mb-2">
-                  Reorder Point *
-                </label>
-                <input
-                  {...register('reorder_point', { 
-                    required: 'Reorder point is required',
-                    min: { value: 0, message: 'Reorder point cannot be negative' }
-                  })}
-                  type="number"
-                  className="w-full px-3 py-2 border-2 border-gray-600 bg-gray-50 rounded-md focus:outline-none focus:ring-2 focus:ring-green-600 focus:border-green-600 text-gray-900"
-                  placeholder="20"
-                />
-                {errors.reorder_point && (
-                  <p className="mt-1 text-sm text-red-600">{errors.reorder_point.message}</p>
-                )}
-                <p className="text-xs text-gray-500 mt-1">Alert when stock falls below this level</p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-gray-800 mb-2">
-                  Reorder Quantity *
-                </label>
-                <input
-                  {...register('reorder_quantity', { 
-                    required: 'Reorder quantity is required',
-                    min: { value: 1, message: 'Reorder quantity must be at least 1' }
-                  })}
-                  type="number"
-                  className="w-full px-3 py-2 border-2 border-gray-600 bg-gray-50 rounded-md focus:outline-none focus:ring-2 focus:ring-green-600 focus:border-green-600 text-gray-900"
-                  placeholder="100"
-                />
-                {errors.reorder_quantity && (
-                  <p className="mt-1 text-sm text-red-600">{errors.reorder_quantity.message}</p>
-                )}
-                <p className="text-xs text-gray-500 mt-1">Suggested quantity to reorder</p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-gray-800 mb-2">
-                  Max Stock Level
-                </label>
-                <input
-                  {...register('max_stock_level', {
-                    min: { value: 0, message: 'Max stock level cannot be negative' }
-                  })}
-                  type="number"
-                  className="w-full px-3 py-2 border-2 border-gray-600 bg-gray-50 rounded-md focus:outline-none focus:ring-2 focus:ring-green-600 focus:border-green-600 text-gray-900"
-                  placeholder="1000"
-                />
-                {errors.max_stock_level && (
-                  <p className="mt-1 text-sm text-red-600">{errors.max_stock_level.message}</p>
-                )}
-                <p className="text-xs text-gray-500 mt-1">Maximum stock capacity</p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-gray-800 mb-2">
-                  Cost Method
-                </label>
-                <select
-                  {...register('cost_method')}
-                  className="w-full px-3 py-2 border-2 border-gray-600 bg-gray-50 rounded-md focus:outline-none focus:ring-2 focus:ring-green-600 focus:border-green-600 text-gray-900"
-                >
-                  <option value="weighted_average">Weighted Average</option>
-                  <option value="fifo">FIFO (First In, First Out)</option>
-                  <option value="lifo">LIFO (Last In, First Out)</option>
-                </select>
-                <p className="text-xs text-gray-500 mt-1">Stock valuation method</p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-gray-800 mb-2">
-                  Shelf Life (Days)
-                </label>
-                <input
-                  {...register('shelf_life_days', {
-                    min: { value: 1, message: 'Shelf life must be at least 1 day' }
-                  })}
-                  type="number"
-                  className="w-full px-3 py-2 border-2 border-gray-600 bg-gray-50 rounded-md focus:outline-none focus:ring-2 focus:ring-green-600 focus:border-green-600 text-gray-900"
-                  placeholder="365"
-                />
-                {errors.shelf_life_days && (
-                  <p className="mt-1 text-sm text-red-600">{errors.shelf_life_days.message}</p>
-                )}
-                <p className="text-xs text-gray-500 mt-1">Default shelf life for new batches</p>
-              </div>
-
-              <div className="flex items-center">
-                <label className="flex items-center space-x-2 cursor-pointer">
-                  <input
-                    {...register('requires_batch_tracking')}
-                    type="checkbox"
-                    className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
+          {/* Image Upload Section */}
+          <div className="grid grid-cols-1 gap-6">
+            <h3 className="text-lg font-bold text-gray-900">Product Image</h3>
+            <div className="flex items-center gap-4">
+              <div className="w-32 h-32 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center overflow-hidden">
+                {imagePath || file ? (
+                  <img 
+                    src={file ? URL.createObjectURL(file) : (imagePath ? supabase.storage.from('product-images').getPublicUrl(imagePath).data.publicUrl : '')} 
+                    alt="Product preview" 
+                    className="w-full h-full object-cover"
                   />
-                  <span className="text-sm font-semibold text-gray-800">
-                    Requires Batch Tracking
-                  </span>
-                </label>
-                <p className="text-xs text-gray-500 mt-1 ml-6">Enable batch/lot tracking for this product</p>
+                ) : (
+                  <span className="text-sm text-gray-400">No image</span>
+                )}
               </div>
-            </div>
-          </div>
-
-          {/* Batch and Dates */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* Image Upload */}
-            <div className="md:col-span-1">
-              <label className="block text-sm font-semibold text-gray-800 mb-2">Product Image</label>
-              <div className="flex items-center gap-3">
-                <div className="w-28 h-28 rounded border flex items-center justify-center bg-gray-50 overflow-hidden">
-                  {imagePath || file ? (
-                    <img
-                      src={file ? URL.createObjectURL(file) : (imagePath ? supabase.storage.from('product-images').getPublicUrl(imagePath).data.publicUrl : '')}
-                      alt="preview"
-                      className="max-w-full max-h-full object-contain"
-                    />
-                  ) : (
-                    <span className="text-xs text-gray-400">No Image</span>
-                  )}
-                </div>
-                <div className="flex flex-col gap-2">
-                  <input id="prod-image" type="file" accept="image/*" className="hidden" onChange={(e)=>{
+              <div className="flex flex-col gap-2">
+                <input 
+                  id="prod-image" 
+                  type="file" 
+                  accept="image/*" 
+                  className="hidden" 
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
                     const f = e.target.files?.[0] || null;
                     setFile(f);
-                  }} />
-                  <label htmlFor="prod-image" className="px-3 py-1 text-sm bg-green-600 text-white rounded cursor-pointer hover:bg-green-700 w-fit">Upload Image</label>
-                  {imagePath && (
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        try {
-                          if (imagePath) {
-                            await supabase.storage.from('product-images').remove([imagePath]);
-                          }
-                          setImagePath(null);
-                          setFile(null);
-                          toast.success('Image removed');
-                        } catch (e: any) {
-                          toast.error(e.message || 'Failed to remove image');
+                  }} 
+                />
+                <label 
+                  htmlFor="prod-image" 
+                  className="px-3 py-1 text-sm bg-green-600 text-white rounded cursor-pointer hover:bg-green-700 w-fit"
+                >
+                  Upload Image
+                </label>
+                {imagePath && (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        if (imagePath) {
+                          await supabase.storage.from('product-images').remove([imagePath]);
                         }
-                      }}
-                      className="px-3 py-1 text-sm bg-red-50 text-red-700 rounded hover:bg-red-100"
-                    >Remove</button>
-                  )}
-                </div>
+                        setImagePath(null);
+                        setFile(null);
+                        toast.success('Image removed');
+                      } catch (e: any) {
+                        toast.error(e.message || 'Failed to remove image');
+                      }
+                    }}
+                    className="px-3 py-1 text-sm bg-red-600 text-white rounded hover:bg-red-700 w-fit"
+                  >
+                    Remove Image
+                  </button>
+                )}
               </div>
-              <p className="text-xs text-gray-500 mt-1">PNG, JPG, or WebP up to 5MB.</p>
             </div>
+            <p className="text-xs text-gray-500 mt-1">PNG, JPG, or WebP up to 5MB.</p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div>
               <label className="block text-sm font-semibold text-gray-800 mb-2">Batch Number</label>
               <input

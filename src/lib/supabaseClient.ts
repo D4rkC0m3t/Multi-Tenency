@@ -2,13 +2,18 @@ import { createClient } from '@supabase/supabase-js';
 
 // Debug: Log environment variables for verification
 console.group('Supabase Client Initialization');
-console.log('Environment:', import.meta.env.MODE);
-console.log('VITE_SUPABASE_URL:', import.meta.env.VITE_SUPABASE_URL ? '***.supabase.co' : 'Not set');
-console.log('VITE_SUPABASE_ANON_KEY:', import.meta.env.VITE_SUPABASE_ANON_KEY ? '***' : 'Not set');
+
+// Access environment variables in a type-safe way
+const env = process.env;
+const viteEnv = import.meta.env;
+
+console.log('Environment:', viteEnv.MODE);
+console.log('VITE_SUPABASE_URL:', viteEnv.VITE_SUPABASE_URL ? '***.supabase.co' : 'Not set');
+console.log('VITE_SUPABASE_ANON_KEY:', viteEnv.VITE_SUPABASE_ANON_KEY ? '***' : 'Not set');
 
 // Always use environment variables - no fallbacks
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.trim();
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY?.trim();
+const supabaseUrl = (viteEnv.VITE_SUPABASE_URL || '').toString().trim();
+const supabaseAnonKey = (viteEnv.VITE_SUPABASE_ANON_KEY || '').toString().trim();
 
 // Validate environment variables
 if (!supabaseUrl || !supabaseAnonKey) {

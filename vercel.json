@@ -6,5 +6,30 @@
   "outputDirectory": "dist",
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
+  ],
+  "regions": ["bom1"],
+  "env": {
+    "NEXT_PUBLIC_ENHANCED_CUSTOMER_SEARCH": "false"
+  },
+  "build": {
+    "env": {
+      "VITE_SUPABASE_URL": "@supabase_url",
+      "VITE_SUPABASE_ANON_KEY": "@supabase_anon_key"
+    }
+  },
+  "github": {
+    "enabled": true,
+    "autoJobCancelation": true,
+    "autoAlias": true
+  },
+  "routes": [
+    {
+      "src": "/api/.*",
+      "dest": "/api"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/index.html"
+    }
   ]
 }

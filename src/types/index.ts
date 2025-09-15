@@ -118,12 +118,13 @@ export interface CustomerFormData {
   customer_type: string;
   phone?: string;
   email?: string;
-  address?: string;
+  gstin?: string;
+  gst_number?: string;
   village?: string;
   district?: string;
   state?: string;
+  address?: string;
   pin_code?: string;
-  gst_number?: string;
   credit_limit: number;
 }
 

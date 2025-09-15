@@ -178,11 +178,11 @@ interface InvoiceItem {
   total: number;
 }
 
-
 interface DualCopyInvoiceProps {
   companyName: string;
   companyAddress: string;
   companyGSTIN: string;
+  companyLogo?: string;
   invoiceNumber: string;
   invoiceDate: string;
   customerName: string;
@@ -199,6 +199,9 @@ const InvoiceSection: React.FC<{
   data: DualCopyInvoiceProps; 
   copyType: 'CUSTOMER COPY' | 'OFFICE COPY' 
 }> = ({ data, copyType }) => {
+  // Destructure only what we need
+  const { companyLogo } = data;
+
   return (
     <View style={styles.section}>
       {/* Copy Label at Top */}
@@ -207,12 +210,11 @@ const InvoiceSection: React.FC<{
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.companyInfo}>
-          <View style={styles.logoContainer}>
-            <Image 
-              style={styles.logo} 
-              src="/Logo_Dashboard.png"
-            />
-          </View>
+          {companyLogo && (
+            <View style={styles.logoContainer}>
+              <Image src={companyLogo} style={styles.logo} />
+            </View>
+          )}
           <View style={styles.companyDetailsContainer}>
             <Text style={styles.companyName}>{data.companyName}</Text>
             <Text style={styles.invoiceText}>{data.companyAddress}</Text>

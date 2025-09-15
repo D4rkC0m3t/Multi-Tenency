@@ -3,7 +3,7 @@ import {
   Box, Typography, Grid, Card, CardContent, CardMedia, Button, TextField, 
   Paper, IconButton, Divider, Dialog, DialogTitle, DialogContent, 
   DialogActions, FormControl, InputLabel, Select, MenuItem, Chip,
-  Stack, CircularProgress, Alert, DialogContentText
+  Stack, CircularProgress, Alert, DialogContentText, List, ListItem, ListItemText
 } from '@mui/material';
 import { 
   Add as AddIcon, Remove as RemoveIcon, Delete as DeleteIcon,
@@ -19,7 +19,7 @@ import { pdf } from '@react-pdf/renderer';
 import { InvoiceQRCode } from '../common/InvoiceQRCode';
 import { BatchSelectionDialog } from './BatchSelectionDialog';
 import DualCopyInvoice from './DualCopyInvoice';
-import { convertToWords } from '../../lib/numberToWords';
+// import { convertToWords } from '../../lib/numberToWords'; // Temporarily disabled
 import toast from 'react-hot-toast';
 
 interface BatchSelection {
@@ -27,11 +27,22 @@ interface BatchSelection {
   quantity: number;
 }
 
+interface CustomerDetails {
+  id: string;
+  name: string;
+  phone?: string;
+  gstin?: string;
+  address?: string;
+  village?: string;
+  district?: string;
+}
+
 interface CartItem {
   product: Product;
   quantity: number;
   paymentStatus?: 'paid' | 'unpaid' | 'partial';
   batchSelections?: BatchSelection[];
+  customer?: CustomerDetails;
 }
 
 const POSPage = () => {
@@ -44,6 +55,16 @@ const POSPage = () => {
   const [categoryFilter, setCategoryFilter] = useState('');
   const [stockFilter, setStockFilter] = useState('all');
   const [sortBy, setSortBy] = useState('name');
+  const [customerSearchQuery, setCustomerSearchQuery] = useState('');
+  
+  // Feature flag for enhanced customer search
+  const enableEnhancedSearch = import.meta.env.VITE_ENABLE_ENHANCED_CUSTOMER_SEARCH === 'true';
+  
+  // State for advanced customer search (only if feature is enabled)
+  const [customerSearchField, setCustomerSearchField] = useState<'name' | 'phone' | 'gstin' | 'village' | 'all'>('all');
+  const [filteredCustomers, setFilteredCustomers] = useState<Customer[]>([]);
+  const [showAdvancedSearch, setShowAdvancedSearch] = useState(false);
+  const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
   
   // Invoice & Checkout States
   const [showCheckoutDialog, setShowCheckoutDialog] = useState(false);
@@ -91,9 +112,10 @@ const POSPage = () => {
       if (productsRes.error) throw productsRes.error;
       if (customersRes.error) throw customersRes.error;
       
+      const customersData = customersRes.data || [];
       setProducts(productsRes.data || []);
-      setCustomers(customersRes.data || []);
-      
+      setCustomers(customersData);
+      setFilteredCustomers(customersData); // Initialize filteredCustomers with all customers
       
       // Generate invoice number
       setInvoiceNumber(`INV-${Date.now()}`);
@@ -104,7 +126,7 @@ const POSPage = () => {
     }
   };
 
-  const addToCart = (product: Product, paid: boolean = false) => {
+  const addToCart = (product: Product) => {
     // Check if product has batch tracking enabled
     const hasBatchTracking = (product as any).batch_tracking_enabled;
     
@@ -219,6 +241,69 @@ const POSPage = () => {
     }
   });
 
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (target && !target.closest('.customer-search-container')) {
+        setShowCustomerDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  // Filter customers based on search query
+  useEffect(() => {
+    if (!customerSearchQuery) {
+      setFilteredCustomers(customers);
+      return;
+    }
+
+    const query = customerSearchQuery.toLowerCase();
+    
+    if (enableEnhancedSearch) {
+      // Enhanced search with field filtering
+      const filtered = customers.filter(customer => {
+        if (customerSearchField === 'all') {
+          return (
+            customer.name.toLowerCase().includes(query) ||
+            (customer.phone && customer.phone.toLowerCase().includes(query)) ||
+            (customer.gstin && customer.gstin.toLowerCase().includes(query)) ||
+            (customer.gst_number && customer.gst_number.toLowerCase().includes(query)) ||
+            (customer.village && customer.village.toLowerCase().includes(query)) ||
+            (customer.district && customer.district.toLowerCase().includes(query)) ||
+            (customer.email && customer.email.toLowerCase().includes(query))
+          );
+        } else if (customerSearchField === 'name') {
+          return customer.name.toLowerCase().includes(query);
+        } else if (customerSearchField === 'phone') {
+          return customer.phone?.toLowerCase().includes(query) || false;
+        } else if (customerSearchField === 'gstin') {
+          return (
+            (customer.gstin && customer.gstin.toLowerCase().includes(query)) ||
+            (customer.gst_number && customer.gst_number.toLowerCase().includes(query)) ||
+            false
+          );
+        } else if (customerSearchField === 'village') {
+          return customer.village?.toLowerCase().includes(query) || false;
+        }
+        return false;
+      });
+      setFilteredCustomers(filtered);
+    } else {
+      // Basic search (name and phone only)
+      const filtered = customers.filter(customer => 
+        customer.name.toLowerCase().includes(query) ||
+        (customer.phone && customer.phone.toLowerCase().includes(query))
+      );
+      setFilteredCustomers(filtered);
+    }
+  }, [customerSearchQuery, customers, customerSearchField, enableEnhancedSearch]);
+
   // Calculate totals with discount and GST
   const subtotal = cart.reduce((sum, item) => sum + ((item.product.sale_price || 0) * item.quantity), 0);
   const discountAmount = discountType === 'percentage' ? (subtotal * discount) / 100 : discount;
@@ -283,7 +368,11 @@ const POSPage = () => {
     return `Rupees ${Math.floor(amount)} Only`;
   };
 
-  const handleCheckout = () => {
+  const handleCheckout = async () => {
+    if (!merchant) {
+      toast.error('No merchant data available');
+      return;
+    }
     if (cart.length === 0) {
       toast.error('Cart is empty');
       return;
@@ -473,6 +562,36 @@ const POSPage = () => {
     setShowQRCode(true);
   };
 
+  const handleRemoveItem = (item: CartItem) => {
+    setCart(cart.filter(cartItem => cartItem !== item));
+  };
+
+  const handleCustomerSelect = (customer: Customer) => {
+    setSelectedCustomer(customer.id);
+    setCustomerSearchQuery(`${customer.name} - ${customer.phone || ''}`);
+    setShowCustomerDropdown(false);
+    
+    // Update cart with customer details
+    if (cart.length > 0) {
+      setCart(prevCart => 
+        prevCart.map(item => ({
+          ...item,
+          customer: {
+            id: customer.id,
+            name: customer.name,
+            phone: customer.phone || '',
+            gstin: customer.gstin || customer.gst_number || '',
+            address: customer.address || '',
+            village: customer.village || '',
+            district: customer.district || ''
+          }
+        }))
+      );
+    }
+    
+    toast.success(`Selected customer: ${customer.name}`);
+  };
+
   const generateInvoice = async (sale: any) => {
     if (!merchant) {
       console.error('No merchant data available for invoice generation');
@@ -560,54 +679,44 @@ const POSPage = () => {
         signedQRCode: qrCodeBase64,
         
         // Company Details
-        companyName: merchant?.business_name || merchant?.name || '',
-        companyAddress: [merchant?.address || ''],
-        gstin: (merchant as any)?.gst_number || '',
-        stateName: merchant?.state || '',
-        stateCode: '27', // Default to Maharashtra, should be dynamic
-        mobile: merchant?.phone || '',
-        email: merchant?.email || '',
-        
-        // Fertilizer Licensing Details
-        fertilizerLicense: (merchant as any)?.fertilizer_license || '',
-        seedLicense: (merchant as any)?.seed_license || '',
-        pesticideLicense: (merchant as any)?.pesticide_license || '',
+        companyName: merchant?.business_name || merchant?.name || 'Your Company Name',
+        companyAddress: [merchant?.address || 'Your Company Address'],
+        gstin: (merchant as any)?.gst_number || 'GSTIN123456789',
+        stateName: merchant?.state || 'Maharashtra',
+        stateCode: '27',
+        mobile: merchant?.phone || '1234567890',
+        email: merchant?.email || 'your.email@example.com',
         
         // Invoice Details
-        invoiceNo: sale.invoice_number,
-        invoiceDate: new Date(sale.sale_date).toLocaleDateString('en-IN'),
-        dateTimeOfSupply: new Date().toISOString(),
+        invoiceNo: sale.invoice_number || `INV-${Date.now()}`,
+        invoiceDate: new Date(sale.sale_date || new Date()).toLocaleDateString('en-IN'),
         
         // Buyer Details
         buyerName: customer?.name || 'Walk-in Customer',
-        buyerAddress: [customer?.address || ''],
-        buyerGstin: (customer as any)?.gst_number || '',
-        buyerStateName: customer?.state || merchant?.state || '',
-        buyerStateCode: '27', // Should be dynamic based on buyer state
-        buyerMobile: customer?.phone || '',
+        buyerAddress: [customer?.address || 'N/A'],
         
         // Items
         items: saleItems.map((item, index) => ({
           sr: index + 1,
           description: item.product.name,
-          lotBatch: item.product.batch_number || '',
-          hsn: (item.product as any).hsn_code || '31054000',
+          hsn: (item.product as any)?.hsn_code || '31054000',
           gst: 18,
-          mfgDate: item.product.manufacturing_date || '',
-          expiryDate: item.product.expiry_date || '',
           qty: item.quantity,
           unit: item.product.unit || 'KG',
           rate: item.unit_price || 0,
           amount: item.total_price || 0,
-          manufacturer: item.product.manufacturer || '',
-          packingDetails: item.product.packing_details || '',
           cgstAmount: (item.total_price || 0) * 0.09,
           sgstAmount: (item.total_price || 0) * 0.09,
-          igstAmount: 0
+          igstAmount: 0,
+          lotBatch: item.product.batch_number || '',
+          mfgDate: item.product.manufacturing_date || '',
+          expiryDate: item.product.expiry_date || '',
+          manufacturer: item.product.manufacturer || '',
+          packingDetails: item.product.packing_details || ''
         })),
         
         // Tax Summary
-        hsnSac: '31054000', // Default HSN for fertilizers
+        hsnSac: '31054000',
         taxableValue: sale.subtotal || (sale.total_amount / 1.18),
         gstRate: 18,
         gstAmount: sale.tax_amount || (sale.total_amount / 1.18) * 0.18,
@@ -616,24 +725,19 @@ const POSPage = () => {
         igstAmount: 0,
         taxAmount: sale.tax_amount || (sale.total_amount / 1.18) * 0.18,
         roundOff: 0,
-        invoiceTotal: sale.total_amount,
-        isInterstate: false, // Should be determined by buyer/seller state comparison
+        invoiceTotal: sale.total_amount || 0,
+        isInterstate: false,
         
         // Amount in Words
-        amountInWords: `Rupees ${convertToWords(sale.total_amount)} Only`,
+        amountInWords: `Rupees ${convertToWords(sale.total_amount || 0)} Only`,
         
         // Outstanding Details
-        currentInvoice: sale.total_amount,
-        totalOutstanding: sale.payment_status === 'pending' ? sale.total_amount : 0,
-        
-        // Bank Details
-        bankName: 'State Bank of India',
-        accountNo: '1234567890',
-        branchIfsc: 'SBIN0001234',
+        currentInvoice: sale.total_amount || 0,
+        totalOutstanding: sale.payment_status === 'pending' ? (sale.total_amount || 0) : 0,
         
         // Footer
         jurisdiction: merchant?.state || 'Maharashtra'
-      };
+      } as const;
 
       console.log('Invoice data prepared:', invoiceData);
 
@@ -694,6 +798,145 @@ const POSPage = () => {
           <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid #e2e8f0' }}>
             {/* Search and Filters */}
             <Box sx={{ mb: 3 }}>
+              <Box sx={{ display: 'flex', gap: 1, mb: 2, position: 'relative' }} className="customer-search-container">
+                <Box sx={{ position: 'relative', width: '100%' }}>
+                  <TextField
+                    fullWidth
+                    label={enableEnhancedSearch 
+                      ? `Search Customer ${customerSearchField !== 'all' ? `by ${customerSearchField}` : ''}`
+                      : 'Search Customer'}
+                    variant="outlined"
+                    size="small"
+                    value={customerSearchQuery}
+                    onChange={(e) => {
+                      setCustomerSearchQuery(e.target.value);
+                      setShowCustomerDropdown(true);
+                    }}
+                    onFocus={() => {
+                      setShowCustomerDropdown(true);
+                      if (!customerSearchQuery) {
+                        setFilteredCustomers(customers); // Show all customers when no search query
+                      }
+                    }}
+                    onClick={() => setShowCustomerDropdown(true)}
+                    placeholder="Type to search customers or click to see all"
+                  />
+                  {showCustomerDropdown && (
+                    <Paper 
+                      sx={{
+                        position: 'absolute',
+                        top: '100%',
+                        left: 0,
+                        right: 0,
+                        maxHeight: 300,
+                        overflow: 'auto',
+                        zIndex: 1300,
+                        mt: 0.5,
+                        border: '1px solid #e2e8f0',
+                        borderRadius: 1,
+                        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                        backgroundColor: 'white'
+                      }}
+                    >
+                      {filteredCustomers.length > 0 ? (
+                        <List sx={{ py: 0 }}>
+                          {filteredCustomers.slice(0, 10).map((customer) => (
+                            <ListItem 
+                              key={customer.id} 
+                              button 
+                              onClick={() => handleCustomerSelect(customer)}
+                              sx={{ 
+                                py: 1,
+                                '&:hover': { 
+                                  backgroundColor: '#f8fafc' 
+                                }
+                              }}
+                            >
+                              <ListItemText 
+                                primary={
+                                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                    {customer.name}
+                                  </Typography>
+                                }
+                                secondary={
+                                  <Typography variant="caption" color="text.secondary">
+                                    {customer.phone} {customer.village ? `• ${customer.village}` : ''}
+                                    {customer.gstin ? ` • GST: ${customer.gstin}` : ''}
+                                  </Typography>
+                                } 
+                              />
+                            </ListItem>
+                          ))}
+                          {filteredCustomers.length > 10 && (
+                            <Box sx={{ p: 1, textAlign: 'center', color: 'text.secondary', fontSize: '0.75rem' }}>
+                              Showing first 10 results. Type to narrow down search.
+                            </Box>
+                          )}
+                        </List>
+                      ) : customerSearchQuery ? (
+                        <Box sx={{ p: 2, color: 'text.secondary', textAlign: 'center' }}>
+                          <Typography variant="body2">No customers found matching "{customerSearchQuery}"</Typography>
+                          <Typography variant="caption">Try searching by name, phone, or village</Typography>
+                        </Box>
+                      ) : (
+                        <Box sx={{ p: 2, color: 'text.secondary', textAlign: 'center' }}>
+                          <Typography variant="body2">Start typing to search customers</Typography>
+                        </Box>
+                      )}
+                    </Paper>
+                  )}
+                </Box>
+                {enableEnhancedSearch && (
+                  <Button 
+                    variant="outlined" 
+                    onClick={() => setShowAdvancedSearch(!showAdvancedSearch)}
+                    size="small"
+                  >
+                    {showAdvancedSearch ? 'Hide Filters' : 'Filters'}
+                  </Button>
+                )}
+              </Box>
+              
+              {showAdvancedSearch && (
+                <Box sx={{ mb: 2, p: 2, border: '1px solid #eee', borderRadius: 1 }}>
+                  <Typography variant="subtitle2" gutterBottom>Search By:</Typography>
+                  <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                    <Chip 
+                      label="All Fields" 
+                      onClick={() => setCustomerSearchField('all')} 
+                      color={customerSearchField === 'all' ? 'primary' : 'default'}
+                      size="small"
+                    />
+                    <Chip 
+                      label="Name" 
+                      onClick={() => setCustomerSearchField('name')} 
+                      color={customerSearchField === 'name' ? 'primary' : 'default'}
+                      size="small"
+                    />
+                    <Chip 
+                      label="Phone" 
+                      onClick={() => setCustomerSearchField('phone')} 
+                      color={customerSearchField === 'phone' ? 'primary' : 'default'}
+                      size="small"
+                    />
+                    <Chip 
+                      label="GSTIN" 
+                      onClick={() => setCustomerSearchField('gstin')} 
+                      color={customerSearchField === 'gstin' ? 'primary' : 'default'}
+                      size="small"
+                    />
+                    <Chip 
+                      label="Village" 
+                      onClick={() => setCustomerSearchField('village')} 
+                      color={customerSearchField === 'village' ? 'primary' : 'default'}
+                      size="small"
+                    />
+                  </Box>
+                  <Typography variant="caption" color="textSecondary" sx={{ mt: 1, display: 'block' }}>
+                    Current filter: {customerSearchField === 'all' ? 'All Fields' : customerSearchField}
+                  </Typography>
+                </Box>
+              )}
               <TextField
                 fullWidth
                 placeholder="🔍 Search products by name, SKU, or category..."
@@ -1105,7 +1348,37 @@ const POSPage = () => {
               <FormControl fullWidth>
                 <Select
                   value={selectedCustomer}
-                  onChange={(e) => setSelectedCustomer(e.target.value)}
+                  onChange={(e) => {
+                    const customerId = e.target.value;
+                    setSelectedCustomer(customerId);
+                    
+                    if (customerId) {
+                      const customer = customers.find(c => c.id === customerId);
+                      if (customer) {
+                        setCustomerSearchQuery(`${customer.name} - ${customer.phone || ''}`);
+                        
+                        // Update cart with customer details
+                        if (cart.length > 0) {
+                          setCart(prevCart => 
+                            prevCart.map(item => ({
+                              ...item,
+                              customer: {
+                                id: customer.id,
+                                name: customer.name,
+                                phone: customer.phone || '',
+                                gstin: customer.gstin || customer.gst_number || '',
+                                address: customer.address || '',
+                                village: customer.village || '',
+                                district: customer.district || ''
+                              }
+                            }))
+                          );
+                        }
+                      }
+                    } else {
+                      setCustomerSearchQuery('');
+                    }
+                  }}
                   displayEmpty
                   sx={{
                     borderRadius: 2,
@@ -1121,11 +1394,32 @@ const POSPage = () => {
                   <MenuItem value="">🚶 Walk-in Customer</MenuItem>
                   {customers.map((customer) => (
                     <MenuItem key={customer.id} value={customer.id}>
-                      {customer.name} - {customer.phone}
+                      {customer.name} - {customer.phone || ''}
                     </MenuItem>
                   ))}
                 </Select>
               </FormControl>
+              
+              {/* Display selected customer info */}
+              {selectedCustomer && (
+                <Box sx={{ mt: 1, p: 1.5, backgroundColor: '#f0f9ff', borderRadius: 1, border: '1px solid #0ea5e9' }}>
+                  {(() => {
+                    const customer = customers.find(c => c.id === selectedCustomer);
+                    return customer ? (
+                      <Box>
+                        <Typography variant="body2" sx={{ fontWeight: 600, color: '#0369a1' }}>
+                          {customer.name}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          📞 {customer.phone || 'N/A'}
+                          {customer.village && ` • 📍 ${customer.village}`}
+                          {(customer.gstin || customer.gst_number) && ` • 🏢 ${customer.gstin || customer.gst_number}`}
+                        </Typography>
+                      </Box>
+                    ) : null;
+                  })()}
+                </Box>
+              )}
             </Box>
 
             {/* GST Rate Selection */}
@@ -1439,11 +1733,35 @@ const POSPage = () => {
                 <MenuItem value="">Walk-in Customer</MenuItem>
                 {customers.map((customer) => (
                   <MenuItem key={customer.id} value={customer.id}>
-                    {customer.name} - {customer.phone}
+                    {customer.name} - {customer.phone || ''}
                   </MenuItem>
                 ))}
               </Select>
             </FormControl>
+            
+            {/* Display selected customer details */}
+            {selectedCustomer && (
+              <Paper sx={{ p: 2, bgcolor: '#f0f9ff', border: '1px solid #0ea5e9' }}>
+                {(() => {
+                  const customer = customers.find(c => c.id === selectedCustomer);
+                  return customer ? (
+                    <Box>
+                      <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#0369a1', mb: 0.5 }}>
+                        Selected Customer
+                      </Typography>
+                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                        {customer.name}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        📞 {customer.phone || 'N/A'}
+                        {customer.village && ` • 📍 ${customer.village}`}
+                        {(customer.gstin || customer.gst_number) && ` • 🏢 ${customer.gstin || customer.gst_number}`}
+                      </Typography>
+                    </Box>
+                  ) : null;
+                })()}
+              </Paper>
+            )}
 
             {/* Payment Method */}
             <FormControl fullWidth>
@@ -1578,10 +1896,12 @@ const POSPage = () => {
                 const { cartItems, customerData, totals, gstRate, paymentMethod: salePaymentMethod, qrCodeImage } = lastSaleData;
                 
                 // Prepare invoice data
+                const companyLogo = (merchant?.settings as any)?.logo_data || (merchant?.settings as any)?.logo_url || `${window.location.origin}/Logo_Dashboard.png`;
                 const invoiceData = {
                   companyName: merchant?.business_name || merchant?.name || 'Business Name',
                   companyAddress: merchant?.address || 'Business Address',
                   companyGSTIN: (merchant as any)?.gst_number || merchant?.gstin || 'GSTIN Not Available',
+                  companyLogo: companyLogo,
                   invoiceNumber: qrCodeData.number,
                   invoiceDate: new Date(qrCodeData.date).toLocaleDateString('en-IN'),
                   customerName: customerData?.name || 'Walk-in Customer',
