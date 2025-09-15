@@ -1,0 +1,20 @@
+{
+  "$schema": "https://github.com/IBM/audit-ci/raw/main/docs/schema.json",
+  "low": true,
+  "moderate": true,
+  "high": true,
+  "critical": true,
+  "report-type": "full",
+  "allowlist": [
+    // Known issues that are safe to ignore
+    // Format: "<advisory-id>"
+  ],
+  "retry-count": 5,
+  "package-manager": "auto",
+  "pass-enoaudit": true,
+  "show-not-found": true,
+  "show-found": true,
+  "registry": "https://registry.npmjs.org",
+  "report-type": "important",
+  "advisories": {}
+}

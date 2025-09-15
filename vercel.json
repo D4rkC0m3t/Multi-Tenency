@@ -1,13 +1,16 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "version": 2,
-  "framework": "vite",
+  "version": 3,
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
-  "rewrites": [
-    { "source": "/(.*)", "destination": "/index.html" }
-  ],
+  "framework": "vite",
   "regions": ["bom1"],
+  "cleanUrls": true,
+  "trailingSlash": false,
+  "rewrites": [
+    { "source": "/api/(?<path>.*)", "destination": "/api/$path" },
+    { "source": "/(?<path>.*)", "destination": "/index.html" }
+  ],
   "github": {
     "enabled": true,
     "autoJobCancelation": true,

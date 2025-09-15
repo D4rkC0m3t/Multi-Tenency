@@ -1,0 +1,52 @@
+# Branch protection rules for main and develop branches
+# Apply these rules in GitHub repository settings
+
+# Main branch protection rules
+main:
+  required_status_checks:
+    strict: true
+    contexts:
+      - "Test and Build"
+      - "Security Scan"
+      - "Lighthouse CI"
+  enforce_admins: false
+  required_pull_request_reviews:
+    required_approving_review_count: 1
+    require_code_owner_reviews: true
+    dismiss_stale_reviews: true
+    require_last_push_approval: true
+  restrictions: null
+  required_linear_history: true
+  allow_force_pushes: false
+  allow_deletions: false
+  block_creations: true
+  required_conversation_resolution: true
+
+# Develop branch protection rules
+develop:
+  required_status_checks:
+    strict: true
+    contexts:
+      - "Test and Build"
+      - "Security Scan"
+  enforce_admins: false
+  required_pull_request_reviews:
+    required_approving_review_count: 1
+    dismiss_stale_reviews: true
+  restrictions: null
+  required_linear_history: true
+  allow_force_pushes: false
+  allow_deletions: false
+  block_creations: true
+  required_conversation_resolution: true
+
+# Protection rules for feature/* branches
+feature/*:
+  required_status_checks: null
+  enforce_admins: false
+  restrictions: null
+  required_pull_request_reviews: null
+  required_linear_history: false
+  allow_force_pushes: true
+  allow_deletions: true
+  block_creations: false

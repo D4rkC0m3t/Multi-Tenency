@@ -1,0 +1,14 @@
+# Default owners for everything in the repo
+* @your-github-username @team-lead-username
+
+# Database related files
+/supabase/ @db-admin-username
+
+# Frontend components
+/src/components/ @frontend-team
+
+# API routes
+/src/api/ @backend-team
+
+# Documentation
+/*.md @docs-team @your-github-username
