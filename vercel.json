@@ -9,11 +9,6 @@
   "trailingSlash": false,
   "rewrites": [
     { "source": "/api/(?<path>.*)", "destination": "/api/$path" },
-    { "source": "/(?<path>.*)", "destination": "/index.html" }
-  ],
-  "github": {
-    "enabled": true,
-    "autoJobCancelation": true,
-    "autoAlias": true
-  }
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
 }
