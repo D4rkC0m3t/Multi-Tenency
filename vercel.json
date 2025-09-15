@@ -21,15 +21,5 @@
     "enabled": true,
     "autoJobCancelation": true,
     "autoAlias": true
-  },
-  "routes": [
-    {
-      "src": "/api/.*",
-      "dest": "/api"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/index.html"
-    }
-  ]
+  }
 }
