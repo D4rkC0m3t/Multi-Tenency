@@ -4,6 +4,7 @@ import react from '@vitejs/plugin-react';
 export default defineConfig(({ mode }) => {
   // Load env file based on `mode` in the current directory.
   // This ensures environment variables are loaded during build
+  // eslint-disable-next-line no-undef
   const env = loadEnv(mode, process.cwd(), '');
   
   return {

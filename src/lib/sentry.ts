@@ -1,16 +1,14 @@
 import * as Sentry from '@sentry/react';
-import { BrowserTracing } from '@sentry/tracing';
 
-const SENTRY_DSN = process.env.VITE_SENTRY_DSN;
-const ENVIRONMENT = process.env.NODE_ENV || 'development';
+const SENTRY_DSN = import.meta.env.VITE_SENTRY_DSN;
+const ENVIRONMENT = import.meta.env.MODE || 'development';
 
 if (SENTRY_DSN) {
   Sentry.init({
     dsn: SENTRY_DSN,
     environment: ENVIRONMENT,
-    integrations: [new BrowserTracing()],
     tracesSampleRate: ENVIRONMENT === 'production' ? 0.2 : 1.0,
-    release: `fertilizer-inventory@${process.env.npm_package_version}`,
+    release: `fertilizer-inventory@1.0.0`,
     beforeSend(event) {
       // Filter out sensitive data
       if (event.request) {
@@ -18,7 +16,7 @@ if (SENTRY_DSN) {
         if (event.request.headers) {
           const sensitiveHeaders = ['authorization', 'cookie', 'set-cookie', 'x-auth-token'];
           sensitiveHeaders.forEach(header => {
-            if (event.request?.headers[header]) {
+            if (event.request?.headers?.[header]) {
               event.request.headers[header] = '[REDACTED]';
             }
           });

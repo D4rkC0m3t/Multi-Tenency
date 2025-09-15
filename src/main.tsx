@@ -16,7 +16,7 @@ console.groupEnd();
 
 // Add debug info to window
 if (import.meta.env.DEV) {
-  // @ts-ignore
+  // @ts-expect-error Window.__ENV is intentionally added for debugging purposes without full type support
   window.__ENV = import.meta.env;
   console.log('Environment variables available at window.__ENV');
 }

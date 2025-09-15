@@ -63,11 +63,11 @@ export function getSupabaseConfig() {
 
 // Add to window for easy debugging in browser console
 if (typeof window !== 'undefined') {
-  // @ts-ignore
+  // @ts-expect-error Window.__debugSupabase is intentionally added for debugging purposes without full type support
   window.__debugSupabase = {
     clearAuth: clearSupabaseAuth,
     getConfig: getSupabaseConfig,
-    // @ts-ignore
+    // @ts-expect-error Window.__debugSupabase.client is intentionally exposed for debugging
     client: supabase,
   };
   

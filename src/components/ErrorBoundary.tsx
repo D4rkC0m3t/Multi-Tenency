@@ -33,7 +33,7 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
     Sentry.captureException(error, { extra: { errorInfo } });
     
     // Log to console in development
-    if (process.env.NODE_ENV === 'development') {
+    if (import.meta.env.MODE === 'development') {
       console.error('Error caught by ErrorBoundary:', error, errorInfo);
     }
   }
@@ -52,7 +52,7 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
           <p className="mb-4">
             We're sorry, but an unexpected error occurred. Our team has been notified.
           </p>
-          {process.env.NODE_ENV === 'development' && (
+          {import.meta.env.MODE === 'development' && (
             <details className="mt-4 p-2 bg-red-100 rounded text-sm">
               <summary className="font-bold cursor-pointer">Error Details</summary>
               <pre className="mt-2 overflow-auto p-2 bg-white rounded">
@@ -79,7 +79,7 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
 }
 
 export default Sentry.withErrorBoundary(ErrorBoundary, {
-  fallback: ({ error: _error, componentStack: _componentStack, resetError }) => (
+  fallback: ({ resetError }) => (
     <div className="p-4 bg-red-50 text-red-800">
       <h2 className="text-xl font-bold mb-2">An error occurred</h2>
       <p className="mb-4">

@@ -4,7 +4,6 @@ import { createClient } from '@supabase/supabase-js';
 console.group('Supabase Client Initialization');
 
 // Access environment variables in a type-safe way
-const env = process.env;
 const viteEnv = import.meta.env;
 
 console.log('Environment:', viteEnv.MODE);
@@ -61,7 +60,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, clientOptions
 
 // Add debug method to window for easier debugging
 if (typeof window !== 'undefined') {
-  // @ts-ignore
+  // @ts-expect-error Window.__debugSupabase is intentionally added for debugging purposes without full type support
   window.__debugSupabase = {
     getConfig: () => ({
       url: supabaseUrl,
