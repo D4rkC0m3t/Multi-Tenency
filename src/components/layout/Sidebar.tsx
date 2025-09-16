@@ -173,30 +173,40 @@ export function Sidebar({ isCollapsed = false, onToggleCollapse }: SidebarProps)
         },
       }}
     >
-      <Toolbar sx={{ minHeight: 72, borderBottom: '1px solid rgba(240, 240, 240, 0.3)', px: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <Toolbar sx={{ minHeight: 72, borderBottom: '1px solid rgba(240, 240, 240, 0.3)', px: 2, display: 'flex', justifyContent: isCollapsed ? 'center' : 'space-between', alignItems: 'center', position: 'relative' }}>
         {!isCollapsed && (
-          <Box
-            component="img"
-            src="/Logo_Dashboard.png"
-            alt="KrishiSethu Logo"
-            sx={{
-              width: '100%',
-              height: 56,
-              objectFit: 'contain',
-              objectPosition: 'center',
-            }}
-          />
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+            <Box
+              component="img"
+              src="https://img.icons8.com/arcade/64/field.png"
+              alt="KrishiSethu Icon"
+              sx={{
+                width: 40,
+                height: 40,
+                objectFit: 'contain',
+              }}
+            />
+            <Box
+              component="img"
+              src="/Logo_Dashboard.png"
+              alt="KrishiSethu Logo"
+              sx={{
+                height: 50,
+                objectFit: 'contain',
+                objectPosition: 'left center',
+              }}
+            />
+          </Box>
         )}
         {isCollapsed && (
           <Box
             component="img"
-            src="/Logo_Dashboard.png"
-            alt="KrishiSethu Logo"
+            src="https://img.icons8.com/arcade/64/field.png"
+            alt="KrishiSethu Icon"
             sx={{
               width: 40,
               height: 40,
               objectFit: 'contain',
-              objectPosition: 'center',
             }}
           />
         )}

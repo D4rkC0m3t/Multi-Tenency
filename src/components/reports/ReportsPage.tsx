@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line } from 'recharts';
 import {
@@ -60,19 +60,45 @@ interface ReportData {
     totalPurchases: number;
     purchaseCount: number;
   };
-  // Additional data for Products and GST reports
-  productsData?: any[];
-  salesDataWithGst?: any[];
+  productsData?: {
+    id: string;
+    name: string;
+    current_stock: number;
+    minimum_stock: number;
+    cost_price: number;
+  }[];
+  salesDataWithGst?: {
+    total_amount: number;
+    sale_date: string;
+    customer_id: string;
+    subtotal: number;
+    tax_amount: number;
+    discount_amount: number;
+    invoice_number: string;
+    customers?: {
+      name?: string;
+    }[];
+    sale_items: {
+      quantity: number;
+      product_id: string;
+      unit_price: number;
+      total_price: number;
+    }[];
+  }[];
   gstSummary?: {
     totalTaxCollected: number;
     totalTaxableAmount: number;
     avgTaxRate: number;
-    gstByHsn: any[];
+    gstByHsn: {
+      hsn_code: string;
+      taxable_amount: number;
+      tax_amount: number;
+      transactions: number;
+    }[];
   };
-  gstByHsn?: any[];
 }
 
-const StatCard = ({ 
+const StatCard = ({
   title, 
   value, 
   icon: Icon, 
@@ -114,7 +140,7 @@ export function ReportsPage() {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<ReportData | null>(null);
 
-  const { register, control, handleSubmit, watch, formState: { errors } } = useForm({
+  const { control, handleSubmit, watch } = useForm({
     defaultValues: {
       startDate: format(startOfMonth(new Date()), 'yyyy-MM-dd'),
       endDate: format(endOfMonth(new Date()), 'yyyy-MM-dd'),
@@ -131,95 +157,8 @@ export function ReportsPage() {
   const reportType = watch('reportType');
 
   const [customers, setCustomers] = useState<Array<{ id: string; name: string }>>([]);
-  const [suppliers, setSuppliers] = useState<{ id: string; name: string }[]>([]);
+  const [suppliers, setSuppliers] = useState<Array<{ id: string; name: string }>>([]);
 
-  const createSampleData = async () => {
-    if (!merchant) return;
-    
-    try {
-      toast.loading('Creating sample data...');
-      
-      // Create sample categories
-      const { data: categoryData, error: categoryError } = await supabase
-        .from('categories')
-        .insert([
-          { name: 'Fertilizers', merchant_id: merchant.id },
-          { name: 'Seeds', merchant_id: merchant.id }
-        ])
-        .select();
-      
-      if (categoryError) throw categoryError;
-      
-      // Create sample products
-      const { data: productData, error: productError } = await supabase
-        .from('products')
-        .insert([
-          {
-            name: 'NPK Fertilizer 20-20-20',
-            cost_price: 850,
-            selling_price: 1000,
-            current_stock: 50,
-            minimum_stock: 10,
-            hsn_code: '31051000',
-            manufacturer: 'Coromandel International',
-            category_id: categoryData?.[0]?.id,
-            merchant_id: merchant.id
-          },
-          {
-            name: 'Urea Fertilizer',
-            cost_price: 600,
-            selling_price: 720,
-            current_stock: 100,
-            minimum_stock: 20,
-            hsn_code: '31021000',
-            manufacturer: 'IFFCO',
-            category_id: categoryData?.[0]?.id,
-            merchant_id: merchant.id
-          },
-          {
-            name: 'Wheat Seeds HD-2967',
-            cost_price: 45,
-            selling_price: 55,
-            current_stock: 200,
-            minimum_stock: 50,
-            hsn_code: '10019900',
-            manufacturer: 'Punjab Agricultural University',
-            category_id: categoryData?.[1]?.id,
-            merchant_id: merchant.id
-          }
-        ])
-        .select();
-      
-      if (productError) throw productError;
-      
-      // Create sample customer
-      const { data: customerData, error: customerError } = await supabase
-        .from('customers')
-        .insert([
-          {
-            name: 'Rajesh Kumar',
-            phone: '9876543210',
-            address: 'Village Khanna, District Ludhiana, Punjab',
-            gst_number: '03ABCDE1234F1Z5',
-            merchant_id: merchant.id
-          }
-        ])
-        .select();
-      
-      if (customerError) throw customerError;
-      
-      toast.dismiss();
-      toast.success('Sample data created successfully!');
-      
-      // Refresh the report data
-      fetchReportData({ startDate, endDate });
-      
-    } catch (error) {
-      toast.dismiss();
-      console.error('Error creating sample data:', error);
-      toast.error('Failed to create sample data');
-    }
-  };
 
   const fetchReportData = async (filter: { startDate: string; endDate: string }) => {
     if (!merchant) {
@@ -248,7 +187,7 @@ export function ReportsPage() {
         .from('merchants')
         .select('id, name, gst_number')
         .eq('id', merchant.id)
-        .single();
+        .maybeSingle();
       
       console.log('Merchant info:', merchantInfo);
       console.log('Merchant error:', merchantError);
@@ -273,7 +212,7 @@ export function ReportsPage() {
           tax_amount,
           discount_amount,
           invoice_number,
-          customers(name, gst_number),
+          customers(name),
           sale_items(quantity, product_id, unit_price, total_price)
         `)
         .eq('merchant_id', merchant.id)
@@ -480,7 +419,7 @@ export function ReportsPage() {
         if (supErr) throw supErr;
         setCustomers(custData || []);
         setSuppliers(supData || []);
-      } catch (e) {
+      } catch {
         toast.error('Failed to load lookup data');
       }
     };
@@ -501,7 +440,7 @@ export function ReportsPage() {
         const reportData: ReportPDFData = {
           reportType: 'performance',
           merchantName: merchant?.name || 'Merchant',
-          merchantAddress: `${(merchant?.settings as any)?.business_address || 'Address Not Set'}\nGSTIN: ${(merchant?.settings as any)?.gst_number || 'Not Set'}\nPhone: ${(merchant?.settings as any)?.phone || 'Not Set'}\nEmail: ${(merchant?.settings as any)?.email || 'Not Set'}`,
+          merchantAddress: `${merchant?.settings?.business_address || 'Address Not Set'}\nGSTIN: ${merchant?.settings?.gstin || 'Not Set'}\nPhone: ${merchant?.settings?.phone || 'Not Set'}\nEmail: ${merchant?.settings?.email || 'Not Set'}`,
           dateRange: `${format(new Date(startDate), 'dd/MM/yyyy')} - ${format(new Date(endDate), 'dd/MM/yyyy')}`,
           generatedDate: format(new Date(), 'dd/MM/yyyy HH:mm'),
           data
@@ -538,9 +477,9 @@ export function ReportsPage() {
           merchantEmail: merchant.email || '',
           dateRange: format(new Date(endDate || new Date()), 'dd/MM/yyyy'),
           generatedDate: format(new Date(), 'dd/MM/yyyy HH:mm'),
-          fertilizerLicense: merchant.fertilizer_license || '',
-          seedLicense: merchant.seed_license || '',
-          pesticideLicense: merchant.pesticide_license || '',
+          fertilizerLicense: merchant.settings?.fertilizer_license || '',
+          seedLicense: merchant.settings?.seed_license || '',
+          pesticideLicense: merchant.settings?.pesticide_license || '',
           gstNumber: merchant.gst_number || '',
           data: { products: products || [] }
         };
@@ -565,25 +504,25 @@ export function ReportsPage() {
           merchantEmail: merchant?.email || '',
           dateRange: `${format(new Date(startDate), 'dd/MM/yyyy')} - ${format(new Date(endDate), 'dd/MM/yyyy')}`,
           generatedDate: format(new Date(), 'dd/MM/yyyy HH:mm'),
-          fertilizerLicense: merchant?.fertilizer_license || '',
-          seedLicense: merchant?.seed_license || '',
-          pesticideLicense: merchant?.pesticide_license || '',
+          fertilizerLicense: merchant?.settings?.fertilizer_license || '',
+          seedLicense: merchant?.settings?.seed_license || '',
+          pesticideLicense: merchant?.settings?.pesticide_license || '',
           gstNumber: merchant?.gst_number || '',
           data: { sales: sales || [] }
         };
       } else {
         // Handle other report types with empty data
         reportData = {
-          reportType: reportType as any,
+          reportType: reportType,
           merchantName: merchant?.name || 'Merchant',
           merchantAddress: merchant?.address || 'Address Not Set',
           merchantPhone: merchant?.phone || '',
           merchantEmail: merchant?.email || '',
           dateRange: `${format(new Date(startDate), 'dd/MM/yyyy')} - ${format(new Date(endDate), 'dd/MM/yyyy')}`,
           generatedDate: format(new Date(), 'dd/MM/yyyy HH:mm'),
-          fertilizerLicense: merchant?.fertilizer_license || '',
-          seedLicense: merchant?.seed_license || '',
-          pesticideLicense: merchant?.pesticide_license || '',
+          fertilizerLicense: merchant?.settings?.fertilizer_license || '',
+          seedLicense: merchant?.settings?.seed_license || '',
+          pesticideLicense: merchant?.settings?.pesticide_license || '',
           gstNumber: merchant?.gst_number || '',
           data: {}
         };
@@ -591,7 +530,7 @@ export function ReportsPage() {
       
       await downloadReportPDF(reportData, `${reportType}_report_${format(new Date(), 'yyyy-MM-dd')}.pdf`);
       toast.success(`${reportType} report downloaded`);
-    } catch (e) {
+    } catch {
       toast.error('Failed to export report');
     }
   };
@@ -607,9 +546,9 @@ export function ReportsPage() {
           merchantEmail: merchant?.email || '',
           dateRange: `${format(new Date(startDate), 'dd/MM/yyyy')} - ${format(new Date(endDate), 'dd/MM/yyyy')}`,
           generatedDate: format(new Date(), 'dd/MM/yyyy HH:mm'),
-          fertilizerLicense: merchant?.fertilizer_license || '',
-          seedLicense: merchant?.seed_license || '',
-          pesticideLicense: merchant?.pesticide_license || '',
+          fertilizerLicense: merchant?.settings?.fertilizer_license || '',
+          seedLicense: merchant?.settings?.seed_license || '',
+          pesticideLicense: merchant?.settings?.pesticide_license || '',
           gstNumber: merchant?.gst_number || '',
           data: data || {}
         };
@@ -646,9 +585,9 @@ export function ReportsPage() {
           merchantEmail: merchant?.email || '',
           dateRange: format(new Date(endDate || new Date()), 'dd/MM/yyyy'),
           generatedDate: format(new Date(), 'dd/MM/yyyy HH:mm'),
-          fertilizerLicense: merchant?.fertilizer_license || '',
-          seedLicense: merchant?.seed_license || '',
-          pesticideLicense: merchant?.pesticide_license || '',
+          fertilizerLicense: merchant?.settings?.fertilizer_license || '',
+          seedLicense: merchant?.settings?.seed_license || '',
+          pesticideLicense: merchant?.settings?.pesticide_license || '',
           gstNumber: merchant?.gst_number || '',
           data: { products: products || [] }
         };
@@ -673,9 +612,9 @@ export function ReportsPage() {
           merchantEmail: merchant?.email || '',
           dateRange: `${format(new Date(startDate), 'dd/MM/yyyy')} - ${format(new Date(endDate), 'dd/MM/yyyy')}`,
           generatedDate: format(new Date(), 'dd/MM/yyyy HH:mm'),
-          fertilizerLicense: merchant?.fertilizer_license || '',
-          seedLicense: merchant?.seed_license || '',
-          pesticideLicense: merchant?.pesticide_license || '',
+          fertilizerLicense: merchant?.settings?.fertilizer_license || '',
+          seedLicense: merchant?.settings?.seed_license || '',
+          pesticideLicense: merchant?.settings?.pesticide_license || '',
           gstNumber: merchant?.gst_number || '',
           data: { sales: sales || [] }
         };
@@ -687,32 +626,32 @@ export function ReportsPage() {
         }
         
         reportData = {
-          reportType: reportType as any,
+          reportType: reportType,
           merchantName: merchant?.name || 'Merchant',
           merchantAddress: merchant?.address || 'Address Not Set',
           merchantPhone: merchant?.phone || '',
           merchantEmail: merchant?.email || '',
           dateRange: `${format(new Date(startDate), 'dd/MM/yyyy')} - ${format(new Date(endDate), 'dd/MM/yyyy')}`,
           generatedDate: format(new Date(), 'dd/MM/yyyy HH:mm'),
-          fertilizerLicense: merchant?.fertilizer_license || '',
-          seedLicense: merchant?.seed_license || '',
-          pesticideLicense: merchant?.pesticide_license || '',
+          fertilizerLicense: merchant?.settings?.fertilizer_license || '',
+          seedLicense: merchant?.settings?.seed_license || '',
+          pesticideLicense: merchant?.settings?.pesticide_license || '',
           gstNumber: merchant?.gst_number || '',
           data: data
         };
       } else {
         // Handle other report types with empty data for preview
         reportData = {
-          reportType: reportType as any,
+          reportType: reportType,
           merchantName: merchant?.name || 'Merchant',
           merchantAddress: merchant?.address || 'Address Not Set',
           merchantPhone: merchant?.phone || '',
           merchantEmail: merchant?.email || '',
           dateRange: `${format(new Date(startDate), 'dd/MM/yyyy')} - ${format(new Date(endDate), 'dd/MM/yyyy')}`,
           generatedDate: format(new Date(), 'dd/MM/yyyy HH:mm'),
-          fertilizerLicense: merchant?.fertilizer_license || '',
-          seedLicense: merchant?.seed_license || '',
-          pesticideLicense: merchant?.pesticide_license || '',
+          fertilizerLicense: merchant?.settings?.fertilizer_license || '',
+          seedLicense: merchant?.settings?.seed_license || '',
+          pesticideLicense: merchant?.settings?.pesticide_license || '',
           gstNumber: merchant?.gst_number || '',
           data: {}
         };
@@ -720,7 +659,7 @@ export function ReportsPage() {
       
       await previewReportPDF(reportData);
       toast.success(`${reportType} report preview opened`);
-    } catch (e) {
+    } catch {
       toast.error('Failed to preview report');
     }
   };
@@ -878,7 +817,7 @@ export function ReportsPage() {
                     </TableHead>
                     <TableBody>
                       {data.productsData && data.productsData.length > 0 ? (
-                        data.productsData.map((product: any) => (
+                        data.productsData.map((product) => (
                           <TableRow key={product.id} hover>
                             <TableCell component="th" scope="row">
                               <Typography variant="body1" fontWeight="medium">
@@ -890,7 +829,7 @@ export function ReportsPage() {
                             <TableCell align="right">₹{(product.cost_price || 0).toFixed(2)}</TableCell>
                             <TableCell align="right">₹{((product.current_stock || 0) * (product.cost_price || 0)).toFixed(2)}</TableCell>
                             <TableCell align="center">
-                              <Chip 
+                              <Chip
                                 label={
                                   (product.current_stock || 0) <= 0 ? 'Out of Stock' :
                                   (product.current_stock || 0) <= (product.minimum_stock || 0) ? 'Low Stock' :
@@ -932,7 +871,7 @@ export function ReportsPage() {
                     <Grid item xs={12} md={4}>
                       <StatCard 
                         title="Total Tax Collected" 
-                        value={`₹${data.gstSummary.totalTaxCollected.toFixed(2)}`} 
+                        value={`₹${data?.gstSummary?.totalTaxCollected?.toFixed(2) || '0.00'}`}
                         icon={MoneyIcon} 
                         color="success.main" 
                       />
@@ -940,7 +879,7 @@ export function ReportsPage() {
                     <Grid item xs={12} md={4}>
                       <StatCard 
                         title="Total Taxable Amount" 
-                        value={`₹${data.gstSummary.totalTaxableAmount.toFixed(2)}`} 
+                        value={`₹${data?.gstSummary?.totalTaxableAmount?.toFixed(2) || '0.00'}`}
                         icon={TrendingUpIcon} 
                         color="primary.main" 
                       />
@@ -948,7 +887,7 @@ export function ReportsPage() {
                     <Grid item xs={12} md={4}>
                       <StatCard 
                         title="Average Tax Rate" 
-                        value={`${data.gstSummary.avgTaxRate.toFixed(2)}%`} 
+                        value={`${data?.gstSummary?.avgTaxRate?.toFixed(2) || '0'}%`}
                         icon={AssessmentIcon} 
                         color="info.main" 
                       />
@@ -974,7 +913,7 @@ export function ReportsPage() {
                         </TableRow>
                       </TableHead>
                       <TableBody>
-                        {data.gstSummary.gstByHsn?.map((item: any, index: number) => (
+                        {data?.gstSummary?.gstByHsn?.map((item, index) => (
                           <TableRow key={index} hover>
                             <TableCell component="th" scope="row">
                               <Typography variant="body1" fontWeight="medium">
@@ -987,10 +926,10 @@ export function ReportsPage() {
                               {item.taxable_amount > 0 ? ((item.tax_amount / item.taxable_amount) * 100).toFixed(2) : 0}%
                             </TableCell>
                             <TableCell align="center">
-                              <Chip 
-                                label={item.transactions} 
-                                color="primary" 
-                                variant="outlined" 
+                              <Chip
+                                label={item.transactions}
+                                color="primary"
+                                variant="outlined"
                                 size="small"
                               />
                             </TableCell>
@@ -1021,7 +960,7 @@ export function ReportsPage() {
                         </TableRow>
                       </TableHead>
                       <TableBody>
-                        {data.salesDataWithGst?.map((sale: any, index: number) => (
+                        {data.salesDataWithGst?.map((sale, index) => (
                           <TableRow key={index} hover>
                             <TableCell component="th" scope="row">
                               <Typography variant="body2" fontWeight="medium">
@@ -1029,11 +968,11 @@ export function ReportsPage() {
                               </Typography>
                             </TableCell>
                             <TableCell>{format(new Date(sale.sale_date), 'dd/MM/yyyy')}</TableCell>
-                            <TableCell>{sale.customers?.name || 'Walk-in Customer'}</TableCell>
+                            <TableCell>{sale.customers && sale.customers.length > 0 ? sale.customers[0]?.name || 'Walk-in Customer' : 'Walk-in Customer'}</TableCell>
                             <TableCell>
-                              <Chip 
-                                label={sale.customers?.gst_number || 'Unregistered'} 
-                                color={sale.customers?.gst_number ? 'success' : 'default'}
+                              <Chip
+                                label={'Unregistered'}
+                                color={'default'}
                                 variant="outlined"
                                 size="small"
                               />

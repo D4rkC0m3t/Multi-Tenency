@@ -28,7 +28,6 @@ import {
 } from '@mui/icons-material';
 import { useAuth } from '../../contexts/AuthContext';
 
-const drawerWidth = 260;
 
 // Breadcrumb mapping for different routes
 const routeLabels: Record<string, string> = {
@@ -86,7 +85,6 @@ export function Navbar() {
   };
 
   const breadcrumbs = generateBreadcrumbs();
-  const currentPageTitle = breadcrumbs[breadcrumbs.length - 1]?.label || 'Dashboard';
 
   const initials = (profile?.full_name || 'User')
     .split(' ')
@@ -109,7 +107,7 @@ export function Navbar() {
       }}
     >
       <Toolbar sx={{ minHeight: 72, px: 3 }}>
-        {/* Left side - Page title and breadcrumbs */}
+        {/* Left side - Business name and welcome message */}
         <Box sx={{ flexGrow: 1 }}>
           <Typography
             variant="h5"
@@ -121,7 +119,7 @@ export function Navbar() {
               fontSize: '1.5rem',
             }}
           >
-            {currentPageTitle}
+            Welcome to {merchant?.name || 'Your Business'}
           </Typography>
           
           <Breadcrumbs

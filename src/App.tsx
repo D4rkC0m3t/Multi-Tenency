@@ -22,10 +22,13 @@ import { StockTakePage } from './components/inventory/StockTakePage';
 import { BatchManagementPage } from './components/inventory/BatchManagementPage';
 import { ReorderAlertsPage } from './components/inventory/ReorderAlertsPage';
 import { EInvoicePage } from './components/einvoice/EInvoicePage';
+import LandingPage from './components/landing/LandingPage';
+import { ResetPasswordPage } from './components/auth/ResetPasswordPage';
 
 
 function AppContent() {
   const { user, loading, merchant } = useAuth();
+  const defaultTheme = createTheme();
 
   if (loading) {
     return (
@@ -35,8 +38,24 @@ function AppContent() {
     );
   }
 
+  // Show landing page or auth pages for non-authenticated users
   if (!user) {
-    return <AuthPage />;
+    return (
+      <ThemeProvider theme={defaultTheme}>
+        <CssBaseline />
+        <div className="app-container">
+          <Routes>
+            <Route path="/" element={<Navigate to="/landing" replace />} />
+            <Route path="/landing" element={<LandingPage />} />
+            <Route path="/login" element={<AuthPage />} />
+            <Route path="/auth" element={<AuthPage />} />
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
+            <Route path="*" element={<Navigate to="/landing" replace />} />
+          </Routes>
+          <Toaster position="top-right" />
+        </div>
+      </ThemeProvider>
+    );
   }
 
   const settings: any = (merchant?.settings as any) || {};
@@ -64,7 +83,8 @@ function AppContent() {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <Routes>
+      <div className="app-container">
+        <Routes>
           {/* Auth Routes */}
           <Route path="/auth" element={<AuthPage />} />
           
@@ -88,20 +108,20 @@ function AppContent() {
             <Route path="einvoice" element={<EInvoicePage />} />
             <Route path="reports" element={<ReportsPage />} />
             <Route path="notifications" element={<NotificationsPage />} />
-
             <Route path="settings" element={<SettingsPage />} />
           </Route>
           
           {/* Fallback redirect */}
           <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-      <Toaster
-        position="top-right"
-        toastOptions={{
-          duration: 4000,
-          style: { background: '#363636', color: '#fff' },
-        }}
-      />
+        </Routes>
+        <Toaster
+          position="top-right"
+          toastOptions={{
+            duration: 4000,
+            style: { background: '#363636', color: '#fff' },
+          }}
+        />
+      </div>
     </ThemeProvider>
   );
 }

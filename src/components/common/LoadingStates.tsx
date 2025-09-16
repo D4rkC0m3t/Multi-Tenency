@@ -1,3 +1,4 @@
+import React from 'react';
 import { Box, CircularProgress, Skeleton, Typography, Stack } from '@mui/material';
 
 // Enhanced loading spinner with optional text

@@ -8,7 +8,11 @@ export function AuthPage() {
 
   return (
     <AuthPageComponent>
-      {isLogin ? <LoginForm onToggleToSignup={() => setIsLogin(false)} /> : <SignUpForm />}
+      {isLogin ? (
+        <LoginForm onToggleToSignup={() => setIsLogin(false)} />
+      ) : (
+        <SignUpForm onBackToLogin={() => setIsLogin(true)} />
+      )}
       
       <div className="mt-6 space-y-4 text-center">
         <div>

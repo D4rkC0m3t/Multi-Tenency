@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Add as AddIcon, Search as SearchIcon, FolderOpen as FolderOpenIcon, Edit as EditIcon, Delete as DeleteIcon } from '@mui/icons-material';
 import { supabase, Category } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -30,15 +30,7 @@ export function CategoriesPage() {
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
 
-  useEffect(() => {
-    if (merchant) {
-      fetchCategories();
-    } else {
-      setLoading(false);
-    }
-  }, [merchant]);
-
-  const fetchCategories = async () => {
+  const fetchCategories = useCallback(async () => {
     if (!merchant) return;
 
     try {
@@ -56,7 +48,16 @@ export function CategoriesPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [merchant]);
+
+  useEffect(() => {
+    if (merchant) {
+      fetchCategories();
+    } else {
+      setLoading(false);
+    }
+  }, [merchant, fetchCategories]);
+  
 
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to delete this category? This will affect all products in this category.')) return;
