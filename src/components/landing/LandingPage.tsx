@@ -10,6 +10,8 @@ const LandingPage: React.FC = () => {
   const navigate = useNavigate();
   const [isVisible, setIsVisible] = useState<Record<string, boolean>>({});
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [scrollY, setScrollY] = useState(0);
+  const [currentBgIndex, setCurrentBgIndex] = useState(0);
   
 
   useEffect(() => {
@@ -265,7 +267,7 @@ const LandingPage: React.FC = () => {
   // Cycle through hero backgrounds
   useEffect(() => {
     const interval = setInterval(() => {
-      setCurrentBgIndex((prevIndex) =>
+      setCurrentBgIndex((prevIndex: number) =>
         (prevIndex + 1) % heroBackgrounds.length
       );
     }, 5000); // Change background every 5 seconds
@@ -1228,7 +1230,7 @@ const LandingPage: React.FC = () => {
                 { icon: '📱', label: 'Phone', color: 'from-green-400 to-green-600' },
                 { icon: '🌐', label: 'Website', color: 'from-purple-400 to-purple-600' },
                 { icon: '📍', label: 'Location', color: 'from-red-400 to-red-600' }
-              ].map((social, index) => (
+              ].map((social) => (
                 <motion.div
                   key={social.label}
                   className={`w-12 h-12 bg-gradient-to-br ${social.color} rounded-full flex items-center justify-center cursor-pointer shadow-lg hover:shadow-xl transition-all duration-300`}
