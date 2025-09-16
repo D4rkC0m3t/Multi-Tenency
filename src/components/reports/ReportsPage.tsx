@@ -77,7 +77,6 @@ interface ReportData {
     invoice_number: string;
     customers?: {
       name?: string;
-      gstin?: string;
     }[];
     sale_items: {
       quantity: number;
@@ -186,9 +185,9 @@ export function ReportsPage() {
       // Also check if merchant exists and get merchant info
       const { data: merchantInfo, error: merchantError } = await supabase
         .from('merchants')
-        .select('id, name, gstin')
+        .select('id, name, gst_number')
         .eq('id', merchant.id)
-        .single();
+        .maybeSingle();
       
       console.log('Merchant info:', merchantInfo);
       console.log('Merchant error:', merchantError);
@@ -213,7 +212,7 @@ export function ReportsPage() {
           tax_amount,
           discount_amount,
           invoice_number,
-          customers(name, gstin),
+          customers(name),
           sale_items(quantity, product_id, unit_price, total_price)
         `)
         .eq('merchant_id', merchant.id)
@@ -478,10 +477,10 @@ export function ReportsPage() {
           merchantEmail: merchant.email || '',
           dateRange: format(new Date(endDate || new Date()), 'dd/MM/yyyy'),
           generatedDate: format(new Date(), 'dd/MM/yyyy HH:mm'),
-          fertilizerLicense: merchant.fertilizer_license || '',
-          seedLicense: merchant.seed_license || '',
-          pesticideLicense: merchant.pesticide_license || '',
-          gstNumber: merchant.gstin || '',
+          fertilizerLicense: merchant.settings?.fertilizer_license || '',
+          seedLicense: merchant.settings?.seed_license || '',
+          pesticideLicense: merchant.settings?.pesticide_license || '',
+          gstNumber: merchant.gst_number || '',
           data: { products: products || [] }
         };
       } else if (reportType === 'sales') {
@@ -505,10 +504,10 @@ export function ReportsPage() {
           merchantEmail: merchant?.email || '',
           dateRange: `${format(new Date(startDate), 'dd/MM/yyyy')} - ${format(new Date(endDate), 'dd/MM/yyyy')}`,
           generatedDate: format(new Date(), 'dd/MM/yyyy HH:mm'),
-          fertilizerLicense: merchant?.fertilizer_license || '',
-          seedLicense: merchant?.seed_license || '',
-          pesticideLicense: merchant?.pesticide_license || '',
-          gstNumber: merchant?.gstin || '',
+          fertilizerLicense: merchant?.settings?.fertilizer_license || '',
+          seedLicense: merchant?.settings?.seed_license || '',
+          pesticideLicense: merchant?.settings?.pesticide_license || '',
+          gstNumber: merchant?.gst_number || '',
           data: { sales: sales || [] }
         };
       } else {
@@ -521,10 +520,10 @@ export function ReportsPage() {
           merchantEmail: merchant?.email || '',
           dateRange: `${format(new Date(startDate), 'dd/MM/yyyy')} - ${format(new Date(endDate), 'dd/MM/yyyy')}`,
           generatedDate: format(new Date(), 'dd/MM/yyyy HH:mm'),
-          fertilizerLicense: merchant?.fertilizer_license || '',
-          seedLicense: merchant?.seed_license || '',
-          pesticideLicense: merchant?.pesticide_license || '',
-          gstNumber: merchant?.gstin || '',
+          fertilizerLicense: merchant?.settings?.fertilizer_license || '',
+          seedLicense: merchant?.settings?.seed_license || '',
+          pesticideLicense: merchant?.settings?.pesticide_license || '',
+          gstNumber: merchant?.gst_number || '',
           data: {}
         };
       }
@@ -547,10 +546,10 @@ export function ReportsPage() {
           merchantEmail: merchant?.email || '',
           dateRange: `${format(new Date(startDate), 'dd/MM/yyyy')} - ${format(new Date(endDate), 'dd/MM/yyyy')}`,
           generatedDate: format(new Date(), 'dd/MM/yyyy HH:mm'),
-          fertilizerLicense: merchant?.fertilizer_license || '',
-          seedLicense: merchant?.seed_license || '',
-          pesticideLicense: merchant?.pesticide_license || '',
-          gstNumber: merchant?.gstin || '',
+          fertilizerLicense: merchant?.settings?.fertilizer_license || '',
+          seedLicense: merchant?.settings?.seed_license || '',
+          pesticideLicense: merchant?.settings?.pesticide_license || '',
+          gstNumber: merchant?.gst_number || '',
           data: data || {}
         };
         await previewReportPDF(reportData);
@@ -586,10 +585,10 @@ export function ReportsPage() {
           merchantEmail: merchant?.email || '',
           dateRange: format(new Date(endDate || new Date()), 'dd/MM/yyyy'),
           generatedDate: format(new Date(), 'dd/MM/yyyy HH:mm'),
-          fertilizerLicense: merchant?.fertilizer_license || '',
-          seedLicense: merchant?.seed_license || '',
-          pesticideLicense: merchant?.pesticide_license || '',
-          gstNumber: merchant?.gstin || '',
+          fertilizerLicense: merchant?.settings?.fertilizer_license || '',
+          seedLicense: merchant?.settings?.seed_license || '',
+          pesticideLicense: merchant?.settings?.pesticide_license || '',
+          gstNumber: merchant?.gst_number || '',
           data: { products: products || [] }
         };
       } else if (reportType === 'sales') {
@@ -613,10 +612,10 @@ export function ReportsPage() {
           merchantEmail: merchant?.email || '',
           dateRange: `${format(new Date(startDate), 'dd/MM/yyyy')} - ${format(new Date(endDate), 'dd/MM/yyyy')}`,
           generatedDate: format(new Date(), 'dd/MM/yyyy HH:mm'),
-          fertilizerLicense: merchant?.fertilizer_license || '',
-          seedLicense: merchant?.seed_license || '',
-          pesticideLicense: merchant?.pesticide_license || '',
-          gstNumber: merchant?.gstin || '',
+          fertilizerLicense: merchant?.settings?.fertilizer_license || '',
+          seedLicense: merchant?.settings?.seed_license || '',
+          pesticideLicense: merchant?.settings?.pesticide_license || '',
+          gstNumber: merchant?.gst_number || '',
           data: { sales: sales || [] }
         };
       } else if (reportType === 'products' || reportType === 'gst') {
@@ -634,10 +633,10 @@ export function ReportsPage() {
           merchantEmail: merchant?.email || '',
           dateRange: `${format(new Date(startDate), 'dd/MM/yyyy')} - ${format(new Date(endDate), 'dd/MM/yyyy')}`,
           generatedDate: format(new Date(), 'dd/MM/yyyy HH:mm'),
-          fertilizerLicense: merchant?.fertilizer_license || '',
-          seedLicense: merchant?.seed_license || '',
-          pesticideLicense: merchant?.pesticide_license || '',
-          gstNumber: merchant?.gstin || '',
+          fertilizerLicense: merchant?.settings?.fertilizer_license || '',
+          seedLicense: merchant?.settings?.seed_license || '',
+          pesticideLicense: merchant?.settings?.pesticide_license || '',
+          gstNumber: merchant?.gst_number || '',
           data: data
         };
       } else {
@@ -650,10 +649,10 @@ export function ReportsPage() {
           merchantEmail: merchant?.email || '',
           dateRange: `${format(new Date(startDate), 'dd/MM/yyyy')} - ${format(new Date(endDate), 'dd/MM/yyyy')}`,
           generatedDate: format(new Date(), 'dd/MM/yyyy HH:mm'),
-          fertilizerLicense: merchant?.fertilizer_license || '',
-          seedLicense: merchant?.seed_license || '',
-          pesticideLicense: merchant?.pesticide_license || '',
-          gstNumber: merchant?.gstin || '',
+          fertilizerLicense: merchant?.settings?.fertilizer_license || '',
+          seedLicense: merchant?.settings?.seed_license || '',
+          pesticideLicense: merchant?.settings?.pesticide_license || '',
+          gstNumber: merchant?.gst_number || '',
           data: {}
         };
       }
@@ -972,8 +971,8 @@ export function ReportsPage() {
                             <TableCell>{sale.customers && sale.customers.length > 0 ? sale.customers[0]?.name || 'Walk-in Customer' : 'Walk-in Customer'}</TableCell>
                             <TableCell>
                               <Chip
-                                label={sale.customers && sale.customers.length > 0 ? sale.customers[0]?.gstin || 'Unregistered' : 'Unregistered'}
-                                color={sale.customers && sale.customers.length > 0 && sale.customers[0]?.gstin ? 'success' : 'default'}
+                                label={'Unregistered'}
+                                color={'default'}
                                 variant="outlined"
                                 size="small"
                               />

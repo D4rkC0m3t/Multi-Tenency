@@ -5,7 +5,6 @@ import {
   CardContent,
   Typography,
   Grid,
-  Avatar,
   Stack,
   Button,
   CircularProgress,
@@ -15,9 +14,8 @@ import {
   Container,
   TextField,
   InputAdornment,
-  IconButton,
-  Badge,
   Fab,
+  Avatar,
 } from '@mui/material';
 import {
   Inventory as PackageIcon,
@@ -26,7 +24,6 @@ import {
   TrendingUp as TrendingUpIcon,
   Warning as AlertTriangleIcon,
   CalendarToday as CalendarIcon,
-  NotificationsNone as NotificationsIcon,
   Search as SearchIcon,
   Add as AddIcon,
 } from '@mui/icons-material';
@@ -72,6 +69,7 @@ export function Dashboard() {
   const [products, setProducts] = useState<any[]>([]);
   const [recentPurchases, setRecentPurchases] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
+  const [customers, setCustomers] = useState<any[]>([]);
 
   useEffect(() => {
     if (merchant) {
@@ -80,6 +78,7 @@ export function Dashboard() {
       fetchRecentPurchases();
       fetchProductsLite();
       fetchCategoriesLite();
+      fetchCustomersLite();
     } else {
       setLoading(false);
     }
@@ -208,49 +207,100 @@ export function Dashboard() {
     }
   };
 
+  const fetchCustomersLite = async () => {
+    if (!merchant) return;
+    try {
+      const { data, error } = await supabase
+        .from('customers')
+        .select('id, name, phone, email')
+        .eq('merchant_id', merchant.id)
+        .eq('is_active', true);
+      if (error) throw error;
+      setCustomers(data || []);
+    } catch (e) {
+      console.error('Customers load failed', e);
+    }
+  };
+
   const statCards = [
     {
       title: 'Total Products',
       value: stats.totalProducts,
       icon: PackageIcon,
-      color: '#1976d2',
-      bgColor: '#e3f2fd',
+      color: '#2563eb', // Blue
+      bgColor: '#dbeafe',
     },
     {
       title: 'Total Customers',
       value: stats.totalCustomers,
       icon: UsersIcon,
-      color: '#388e3c',
-      bgColor: '#e8f5e8',
+      color: '#059669', // Emerald
+      bgColor: '#d1fae5',
     },
     {
       title: 'Total Sales',
       value: `₹${stats.totalSales.toFixed(2)}`,
       icon: TrendingUpIcon,
-      color: '#7b1fa2',
-      bgColor: '#f3e5f5',
+      color: '#dc2626', // Red
+      bgColor: '#fee2e2',
     },
     {
       title: 'Monthly Sales',
       value: `₹${stats.monthlySales.toFixed(2)}`,
       icon: ShoppingCartIcon,
-      color: '#f57c00',
-      bgColor: '#fff3e0',
+      color: '#7c3aed', // Violet
+      bgColor: '#ede9fe',
     },
   ];
 
+  // Search functionality
+  const filteredProducts = useMemo(() => {
+    if (!query.trim()) return products;
+    const searchTerm = query.toLowerCase();
+    return products.filter((p: any) => 
+      (p.name && p.name.toLowerCase().includes(searchTerm)) ||
+      (p.unit && p.unit.toLowerCase().includes(searchTerm)) ||
+      searchTerm === 'products' || searchTerm === 'product'
+    );
+  }, [products, query]);
+
+  const filteredCustomers = useMemo(() => {
+    if (!query.trim()) return customers;
+    const searchTerm = query.toLowerCase();
+    return customers.filter((c: any) => 
+      (c.name && c.name.toLowerCase().includes(searchTerm)) ||
+      (c.phone && c.phone.includes(query)) ||
+      (c.email && c.email.toLowerCase().includes(searchTerm)) ||
+      searchTerm === 'customers' || searchTerm === 'customer'
+    );
+  }, [customers, query]);
+
+  const filteredSales = useMemo(() => {
+    if (!query.trim()) return recentSales;
+    const searchTerm = query.toLowerCase();
+    return recentSales.filter((s: any) => 
+      (s.invoice_number && s.invoice_number.toLowerCase().includes(searchTerm)) ||
+      searchTerm === 'sales' || searchTerm === 'sale'
+    );
+  }, [recentSales, query]);
+
   // Derived: low stock list and category distribution for charts
-  const lowStockList = useMemo(() => (products || []).filter((p: any) => Number(p.current_stock) <= Number(p.minimum_stock)).slice(0, 6), [products]);
+  const lowStockList = useMemo(() => {
+    const baseProducts = query.trim() ? filteredProducts : products;
+    return (baseProducts || []).filter((p: any) => Number(p.current_stock) <= Number(p.minimum_stock)).slice(0, 6);
+  }, [products, filteredProducts, query]);
+
   const categoryDistribution = useMemo(() => {
+    const baseProducts = query.trim() ? filteredProducts : products;
     const map = new Map<string, number>();
-    for (const p of products) {
+    for (const p of baseProducts) {
       const key = p.category_id || 'uncat';
       map.set(key, (map.get(key) || 0) + 1);
     }
     const nameById = new Map<string, string>(categories.map((c:any)=>[c.id, c.name]));
     const arr = Array.from(map.entries()).map(([id, value]) => ({ name: nameById.get(id) || 'Uncategorized', value }));
     return arr.length ? arr : [{ name: 'No Data', value: 1 }];
-  }, [products, categories]);
+  }, [products, filteredProducts, categories, query]);
   const COLORS = ['#16a34a', '#0284c7', '#9333ea', '#f59e0b', '#ef4444', '#0ea5e9'];
 
   // Dummy inventory trend from monthlySales; In real, fetch by month
@@ -287,26 +337,54 @@ export function Dashboard() {
   }
 
   return (
-    <Container maxWidth="xl" sx={{ py: 3 }}>
+    <Container maxWidth="xl" sx={{ py: 4 }}>
       {/* Header with search, notifications, avatar */}
-      <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} alignItems={{ xs: 'stretch', md: 'center' }} justifyContent="space-between" sx={{ mb: 3 }}>
+      <Stack 
+        direction={{ xs: 'column', md: 'row' }} 
+        spacing={{ xs: 3, md: 2 }} 
+        alignItems={{ xs: 'stretch', md: 'center' }} 
+        justifyContent="space-between" 
+        sx={{ mb: 4 }}
+      >
         <Box>
-          <Typography variant="h4" fontWeight={800}>KrishiSethu Dashboard</Typography>
-          <Typography variant="body2" color="text.secondary">Overview of your inventory and sales performance</Typography>
+          <Typography variant="h4" fontWeight={800} sx={{ mb: 0.5 }}>
+            KrishiSethu Dashboard
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            Overview of your inventory and sales performance
+          </Typography>
         </Box>
-        <Stack direction="row" spacing={1.5} alignItems="center">
-          <TextField size="small" placeholder="Search…" value={query} onChange={(e)=>setQuery(e.target.value)} InputProps={{ startAdornment: (<InputAdornment position="start"><SearchIcon /></InputAdornment>) }} />
-          <IconButton color="inherit">
-            <Badge color="error" variant="dot">
-              <NotificationsIcon />
-            </Badge>
-          </IconButton>
-          <Avatar sx={{ bgcolor: 'success.main' }}>{(merchant?.name || 'KS').slice(0,1).toUpperCase()}</Avatar>
+        <Stack direction="row" spacing={2} alignItems="center">
+          <TextField 
+            size="small" 
+            placeholder="Search products, customers, sales..." 
+            value={query} 
+            onChange={(e)=>setQuery(e.target.value)} 
+            sx={{ minWidth: 300 }}
+            InputProps={{ 
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon />
+                </InputAdornment>
+              ) 
+            }} 
+          />
         </Stack>
       </Stack>
 
+      {/* Search Results Indicator */}
+      {query.trim() && (
+        <Box sx={{ mb: 3 }}>
+          <Alert severity="info" sx={{ borderRadius: 2 }}>
+            <Typography variant="body2">
+              Showing search results for "{query}" - Found {filteredProducts.length} products, {filteredCustomers.length} customers, {filteredSales.length} sales
+            </Typography>
+          </Alert>
+        </Box>
+      )}
+
       {/* KPI / Stat Cards */}
-      <Grid container spacing={2.5} sx={{ mb: 3.5 }}>
+      <Grid container spacing={3} sx={{ mb: 4 }}>
         {statCards.map((card, index) => (
           <Grid item xs={12} sm={6} lg={3} key={index}>
             <Card sx={{ 
@@ -321,13 +399,19 @@ export function Dashboard() {
                 boxShadow: 4
               }
             }}>
-              <CardContent sx={{ p: 2 }}>
-                <Stack direction="row" alignItems="center" spacing={2}>
-                  <Avatar sx={{ bgcolor: card.bgColor, color: card.color, width: 56, height: 56 }}>
+              <CardContent sx={{ p: 3 }}>
+                <Stack direction="row" alignItems="center" spacing={2.5}>
+                  <Avatar sx={{ 
+                    bgcolor: card.bgColor, 
+                    color: card.color, 
+                    width: 60, 
+                    height: 60,
+                    '& svg': { fontSize: 28 }
+                  }}>
                     <card.icon />
                   </Avatar>
-                  <Box>
-                    <Typography variant="body2" color="text.secondary" gutterBottom>
+                  <Box sx={{ flex: 1 }}>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
                       {card.title}
                     </Typography>
                     <Typography variant="h5" fontWeight="bold" color={card.color}>
@@ -342,11 +426,18 @@ export function Dashboard() {
       </Grid>
 
       {/* Charts Row */}
-      <Grid container spacing={2.5} sx={{ mb: 3.5 }}>
+      <Grid container spacing={3} sx={{ mb: 4 }}>
         <Grid item xs={12} md={8}>
-          <Card sx={{ p: 2, borderRadius: 3, boxShadow: 2 }}>
-            <Typography variant="h6" sx={{ mb: 1 }}>Inventory Trend</Typography>
-            <Box sx={{ height: 280 }}>
+          <Card sx={{ 
+            p: 3, 
+            borderRadius: 3, 
+            boxShadow: 2,
+            height: '100%'
+          }}>
+            <Typography variant="h6" fontWeight="bold" sx={{ mb: 2 }}>
+              Inventory Trend
+            </Typography>
+            <Box sx={{ height: 300 }}>
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={trendData} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" />
@@ -360,9 +451,16 @@ export function Dashboard() {
           </Card>
         </Grid>
         <Grid item xs={12} md={4}>
-          <Card sx={{ p: 2, borderRadius: 3, boxShadow: 2 }}>
-            <Typography variant="h6" sx={{ mb: 1 }}>Stock by Category</Typography>
-            <Box sx={{ height: 280 }}>
+          <Card sx={{ 
+            p: 3, 
+            borderRadius: 3, 
+            boxShadow: 2,
+            height: '100%'
+          }}>
+            <Typography variant="h6" fontWeight="bold" sx={{ mb: 2 }}>
+              Stock by Category
+            </Typography>
+            <Box sx={{ height: 300 }}>
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie data={categoryDistribution} dataKey="value" nameKey="name" outerRadius={100}>
@@ -379,19 +477,19 @@ export function Dashboard() {
       </Grid>
 
       {/* Alerts Row */}
-      <Grid container spacing={2.5} sx={{ mb: 3.5 }}>
+      <Grid container spacing={3} sx={{ mb: 4 }}>
         {alertCards.map((card, index) => (
           <Grid item xs={12} md={6} key={index}>
-            <Alert severity={card.severity} sx={{ p: 2 }}>
+            <Alert severity={card.severity} sx={{ p: 3, borderRadius: 2 }}>
               <AlertTitle>
-                <Stack direction="row" alignItems="center" spacing={1}>
+                <Stack direction="row" alignItems="center" spacing={1.5}>
                   <card.icon />
-                  <Typography variant="h6" component="span">
+                  <Typography variant="h6" component="span" fontWeight="bold">
                     {card.title}
                   </Typography>
                 </Stack>
               </AlertTitle>
-              <Typography variant="h4" fontWeight="bold" sx={{ my: 1 }}>
+              <Typography variant="h4" fontWeight="bold" sx={{ my: 1.5 }}>
                 {card.value}
               </Typography>
               <Typography variant="body2">
@@ -403,19 +501,41 @@ export function Dashboard() {
       </Grid>
 
       {/* Low Stock and Quick Actions */}
-      <Grid container spacing={2.5} sx={{ mb: 3.5 }}>
+      <Grid container spacing={3} sx={{ mb: 4 }}>
         <Grid item xs={12} md={7}>
-          <Card sx={{ borderRadius: 3 }}>
-            <CardContent>
-              <Typography variant="h6" gutterBottom fontWeight="bold">Low Stock Items</Typography>
+          <Card sx={{ borderRadius: 3, boxShadow: 2, height: '100%' }}>
+            <CardContent sx={{ p: 3 }}>
+              <Typography variant="h6" gutterBottom fontWeight="bold" sx={{ mb: 2 }}>
+                Low Stock Items
+              </Typography>
               {lowStockList.length === 0 ? (
-                <Typography variant="body2" color="text.secondary">All good! No items at or below minimum stock.</Typography>
+                <Typography variant="body2" color="text.secondary">
+                  All good! No items at or below minimum stock.
+                </Typography>
               ) : (
-                <Stack spacing={1}>
+                <Stack spacing={1.5}>
                   {lowStockList.map((p) => (
-                    <Stack key={p.id} direction="row" alignItems="center" justifyContent="space-between">
-                      <Typography variant="body2">{p.name}</Typography>
-                      <Chip label={`Stock: ${p.current_stock} / Min: ${p.minimum_stock}`} color="error" size="small" />
+                    <Stack 
+                      key={p.id} 
+                      direction="row" 
+                      alignItems="center" 
+                      justifyContent="space-between"
+                      sx={{ 
+                        p: 1.5, 
+                        bgcolor: 'grey.50', 
+                        borderRadius: 1,
+                        border: '1px solid',
+                        borderColor: 'grey.200'
+                      }}
+                    >
+                      <Typography variant="body2" fontWeight="medium">
+                        {p.name}
+                      </Typography>
+                      <Chip 
+                        label={`Stock: ${p.current_stock} / Min: ${p.minimum_stock}`} 
+                        color="error" 
+                        size="small" 
+                      />
                     </Stack>
                   ))}
                 </Stack>
@@ -424,29 +544,88 @@ export function Dashboard() {
           </Card>
         </Grid>
         <Grid item xs={12} md={5}>
-          <Card sx={{ borderRadius: 3 }}>
-            <CardContent>
-              <Typography variant="h6" gutterBottom fontWeight="bold">Quick Actions</Typography>
+          <Card sx={{ borderRadius: 3, boxShadow: 2, height: '100%' }}>
+            <CardContent sx={{ p: 3 }}>
+              <Typography variant="h6" gutterBottom fontWeight="bold" sx={{ mb: 2 }}>
+                Quick Actions
+              </Typography>
               <Grid container spacing={2}>
                 <Grid item xs={12} sm={6}>
-                  <Button variant="outlined" fullWidth sx={{ p: 2, height: 'auto', flexDirection: 'column', alignItems: 'flex-start' }} onClick={() => navigate('/products')}>
-                    <PackageIcon sx={{ color: 'success.main', mb: 1, fontSize: 28 }} />
-                    <Typography variant="subtitle2" fontWeight="bold">Add New Product</Typography>
-                    <Typography variant="caption" color="text.secondary">Add products to inventory</Typography>
+                  <Button 
+                    variant="outlined" 
+                    fullWidth 
+                    sx={{ 
+                      p: 2.5, 
+                      height: 'auto', 
+                      flexDirection: 'column', 
+                      alignItems: 'center',
+                      borderRadius: 2,
+                      '&:hover': {
+                        transform: 'translateY(-1px)',
+                        boxShadow: 2
+                      }
+                    }} 
+                    onClick={() => navigate('/products')}
+                  >
+                    <PackageIcon sx={{ color: 'success.main', mb: 1, fontSize: 32 }} />
+                    <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 0.5 }}>
+                      Add New Product
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary" textAlign="center">
+                      Add products to inventory
+                    </Typography>
                   </Button>
                 </Grid>
                 <Grid item xs={12} sm={6}>
-                  <Button variant="outlined" fullWidth sx={{ p: 2, height: 'auto', flexDirection: 'column', alignItems: 'flex-start' }} onClick={() => navigate('/pos')}>
-                    <ShoppingCartIcon sx={{ color: 'primary.main', mb: 1, fontSize: 28 }} />
-                    <Typography variant="subtitle2" fontWeight="bold">Create Sale</Typography>
-                    <Typography variant="caption" color="text.secondary">Record a new sale</Typography>
+                  <Button 
+                    variant="outlined" 
+                    fullWidth 
+                    sx={{ 
+                      p: 2.5, 
+                      height: 'auto', 
+                      flexDirection: 'column', 
+                      alignItems: 'center',
+                      borderRadius: 2,
+                      '&:hover': {
+                        transform: 'translateY(-1px)',
+                        boxShadow: 2
+                      }
+                    }} 
+                    onClick={() => navigate('/pos')}
+                  >
+                    <ShoppingCartIcon sx={{ color: 'primary.main', mb: 1, fontSize: 32 }} />
+                    <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 0.5 }}>
+                      Create Sale
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary" textAlign="center">
+                      Record a new sale
+                    </Typography>
                   </Button>
                 </Grid>
                 <Grid item xs={12}>
-                  <Button variant="outlined" fullWidth sx={{ p: 2, height: 'auto', flexDirection: 'column', alignItems: 'flex-start' }} onClick={() => navigate('/customers')}>
-                    <UsersIcon sx={{ color: 'secondary.main', mb: 1, fontSize: 28 }} />
-                    <Typography variant="subtitle2" fontWeight="bold">Add Customer</Typography>
-                    <Typography variant="caption" color="text.secondary">Register new customer</Typography>
+                  <Button 
+                    variant="outlined" 
+                    fullWidth 
+                    sx={{ 
+                      p: 2.5, 
+                      height: 'auto', 
+                      flexDirection: 'column', 
+                      alignItems: 'center',
+                      borderRadius: 2,
+                      '&:hover': {
+                        transform: 'translateY(-1px)',
+                        boxShadow: 2
+                      }
+                    }} 
+                    onClick={() => navigate('/customers')}
+                  >
+                    <UsersIcon sx={{ color: 'secondary.main', mb: 1, fontSize: 32 }} />
+                    <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 0.5 }}>
+                      Add Customer
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary" textAlign="center">
+                      Register new customer
+                    </Typography>
                   </Button>
                 </Grid>
               </Grid>
@@ -456,55 +635,93 @@ export function Dashboard() {
       </Grid>
 
       {/* Recent Sales & Purchases */}
-      <Grid container spacing={2.5} sx={{ mb: 2 }}>
+      <Grid container spacing={3} sx={{ mb: 4 }}>
         <Grid item xs={12} md={6}>
-          <Card sx={{ borderRadius: 3 }}>
-            <CardContent>
-              <Typography variant="h6" gutterBottom fontWeight="bold">Recent Sales</Typography>
-              {recentSales.length === 0 ? (
-                <Typography variant="body2" color="text.secondary">No recent sales.</Typography>
+          <Card sx={{ borderRadius: 3, boxShadow: 2, height: '100%' }}>
+            <CardContent sx={{ p: 3 }}>
+              <Typography variant="h6" gutterBottom fontWeight="bold" sx={{ mb: 2 }}>
+                {query.trim() ? `Sales Results (${filteredSales.length})` : 'Recent Sales'}
+              </Typography>
+              {filteredSales.length === 0 ? (
+                <Typography variant="body2" color="text.secondary">
+                  {query.trim() ? 'No sales found matching your search.' : 'No recent sales.'}
+                </Typography>
               ) : (
-                <Grid container spacing={1.8}>
-                  {recentSales.map((s) => (
-                    <Grid item xs={12} key={s.id}>
-                      <Card variant="outlined">
-                        <CardContent sx={{ p: 1.5 }}>
-                          <Stack direction="row" justifyContent="space-between" alignItems="center">
-                            <Typography variant="subtitle2">{s.invoice_number}</Typography>
-                            <Typography variant="subtitle2" fontWeight={700}>₹{Number(s.total_amount || 0).toFixed(2)}</Typography>
-                          </Stack>
-                          <Typography variant="caption" color="text.secondary">{new Date(s.sale_date).toLocaleString()}</Typography>
-                        </CardContent>
-                      </Card>
-                    </Grid>
+                <Stack spacing={2}>
+                  {filteredSales.slice(0, 5).map((s) => (
+                    <Card 
+                      key={s.id} 
+                      variant="outlined" 
+                      sx={{ 
+                        borderRadius: 2,
+                        '&:hover': {
+                          boxShadow: 1,
+                          transform: 'translateY(-1px)'
+                        },
+                        transition: 'all 0.2s'
+                      }}
+                    >
+                      <CardContent sx={{ p: 2 }}>
+                        <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.5 }}>
+                          <Typography variant="subtitle2" fontWeight="bold">
+                            {s.invoice_number}
+                          </Typography>
+                          <Typography variant="subtitle2" fontWeight={700} color="success.main">
+                            ₹{Number(s.total_amount || 0).toFixed(2)}
+                          </Typography>
+                        </Stack>
+                        <Typography variant="caption" color="text.secondary">
+                          {new Date(s.sale_date).toLocaleString()}
+                        </Typography>
+                      </CardContent>
+                    </Card>
                   ))}
-                </Grid>
+                </Stack>
               )}
             </CardContent>
           </Card>
         </Grid>
         <Grid item xs={12} md={6}>
-          <Card sx={{ borderRadius: 3 }}>
-            <CardContent>
-              <Typography variant="h6" gutterBottom fontWeight="bold">Recent Purchases</Typography>
+          <Card sx={{ borderRadius: 3, boxShadow: 2, height: '100%' }}>
+            <CardContent sx={{ p: 3 }}>
+              <Typography variant="h6" gutterBottom fontWeight="bold" sx={{ mb: 2 }}>
+                Recent Purchases
+              </Typography>
               {recentPurchases.length === 0 ? (
-                <Typography variant="body2" color="text.secondary">No recent purchases.</Typography>
+                <Typography variant="body2" color="text.secondary">
+                  No recent purchases.
+                </Typography>
               ) : (
-                <Grid container spacing={1.8}>
+                <Stack spacing={2}>
                   {recentPurchases.map((p) => (
-                    <Grid item xs={12} key={p.id}>
-                      <Card variant="outlined">
-                        <CardContent sx={{ p: 1.5 }}>
-                          <Stack direction="row" justifyContent="space-between" alignItems="center">
-                            <Typography variant="subtitle2">{p.supplier?.name || 'Supplier'}</Typography>
-                            <Typography variant="subtitle2" fontWeight={700}>₹{Number(p.total_amount || 0).toFixed(2)}</Typography>
-                          </Stack>
-                          <Typography variant="caption" color="text.secondary">{new Date(p.created_at).toLocaleString()}</Typography>
-                        </CardContent>
-                      </Card>
-                    </Grid>
+                    <Card 
+                      key={p.id} 
+                      variant="outlined" 
+                      sx={{ 
+                        borderRadius: 2,
+                        '&:hover': {
+                          boxShadow: 1,
+                          transform: 'translateY(-1px)'
+                        },
+                        transition: 'all 0.2s'
+                      }}
+                    >
+                      <CardContent sx={{ p: 2 }}>
+                        <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.5 }}>
+                          <Typography variant="subtitle2" fontWeight="bold">
+                            {p.supplier?.name || 'Supplier'}
+                          </Typography>
+                          <Typography variant="subtitle2" fontWeight={700} color="primary.main">
+                            ₹{Number(p.total_amount || 0).toFixed(2)}
+                          </Typography>
+                        </Stack>
+                        <Typography variant="caption" color="text.secondary">
+                          {new Date(p.created_at).toLocaleString()}
+                        </Typography>
+                      </CardContent>
+                    </Card>
                   ))}
-                </Grid>
+                </Stack>
               )}
             </CardContent>
           </Card>

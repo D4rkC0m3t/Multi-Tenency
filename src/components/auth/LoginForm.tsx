@@ -1,14 +1,16 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { 
   Visibility as VisibilityIcon, 
   VisibilityOff as VisibilityOffIcon,
   Email as EmailIcon,
-  Palette as PaletteIcon
+  Home as HomeIcon
 } from '@mui/icons-material';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import toast from 'react-hot-toast';
 import Lottie from 'lottie-react';
+import { ForgotPasswordModal } from './ForgotPasswordModal';
 import './LoginForm.css';
 
 // Import animations
@@ -20,81 +22,23 @@ interface LoginFormData {
   password: string;
 }
 
-type ColorTheme = 'emerald' | 'blue' | 'purple' | 'indigo' | 'teal';
-
-const colorThemes = {
-  emerald: {
-    primary: 'emerald',
-    gradient: 'from-emerald-600 to-green-600',
-    accent: 'emerald-500',
-    light: 'emerald-50',
-    ring: 'emerald-500',
-    hover: 'emerald-700',
-    text: 'emerald-600',
-    icon: 'emerald-600'
-  },
-  blue: {
-    primary: 'blue',
-    gradient: 'from-blue-600 to-indigo-600',
-    accent: 'blue-500',
-    light: 'blue-50',
-    ring: 'blue-500',
-    hover: 'blue-700',
-    text: 'blue-600',
-    icon: 'blue-600'
-  },
-  purple: {
-    primary: 'purple',
-    gradient: 'from-purple-600 to-pink-600',
-    accent: 'purple-500',
-    light: 'purple-50',
-    ring: 'purple-500',
-    hover: 'purple-700',
-    text: 'purple-600',
-    icon: 'purple-600'
-  },
-  indigo: {
-    primary: 'indigo',
-    gradient: 'from-indigo-600 to-blue-600',
-    accent: 'indigo-500',
-    light: 'indigo-50',
-    ring: 'indigo-500',
-    hover: 'indigo-700',
-    text: 'indigo-600',
-    icon: 'indigo-600'
-  },
-  teal: {
-    primary: 'teal',
-    gradient: 'from-teal-600 to-cyan-600',
-    accent: 'teal-500',
-    light: 'teal-50',
-    ring: 'teal-500',
-    hover: 'teal-700',
-    text: 'teal-600',
-    icon: 'teal-600'
-  }
-};
 
 interface LoginFormProps {
   onToggleToSignup?: () => void;
 }
 
 export function LoginForm({ onToggleToSignup }: LoginFormProps) {
+  const navigate = useNavigate();
+  
+  const handleGoHome = () => {
+    navigate('/landing');
+  };
   const { signIn } = useAuth();
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [currentTheme, setCurrentTheme] = useState<ColorTheme>('emerald');
-  const [currentSlide, setCurrentSlide] = useState(0);
   const [isSignIn, setIsSignIn] = useState(true);
-  const theme = colorThemes[currentTheme];
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
 
-  // Background slide animation
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setCurrentSlide((prev) => (prev + 1) % 5);
-    }, 4000);
-    return () => clearInterval(interval);
-  }, []);
   
   const {
     register,
@@ -114,39 +58,39 @@ export function LoginForm({ onToggleToSignup }: LoginFormProps) {
   };
 
   return (
-    <div className="min-h-screen relative flex flex-col p-4 overflow-hidden">
-      {/* Agricultural Background Slides */}
-      <div className="absolute inset-0 z-0">
-        <div className="absolute inset-0 bg-gradient-to-br from-green-900/20 via-emerald-800/30 to-green-900/40"></div>
-        <div className="agricultural-slides">
-          {[
-            { icon: '🌾', title: 'Fertilizer Management', subtitle: 'Track your agricultural inventory', gradient: 'from-green-600/90 to-emerald-600/90' },
-            { icon: '🚜', title: 'Smart Agriculture', subtitle: 'Modern farming solutions', gradient: 'from-amber-600/90 to-yellow-600/90' },
-            { icon: '🌱', title: 'Crop Nutrition', subtitle: 'Optimize plant growth', gradient: 'from-teal-600/90 to-cyan-600/90' },
-            { icon: '🏭', title: 'Inventory Control', subtitle: 'Warehouse management', gradient: 'from-orange-600/90 to-red-600/90' },
-            { icon: '📊', title: 'Analytics & Reports', subtitle: 'Data-driven insights', gradient: 'from-purple-600/90 to-indigo-600/90' }
-          ].map((slide, index) => (
-            <div 
-              key={index}
-              className={`slide absolute inset-0 transition-opacity duration-1000 ${
-                currentSlide === index ? 'opacity-100' : 'opacity-0'
-              }`}
-            >
-              <div className={`absolute inset-0 bg-gradient-to-r ${slide.gradient}`}></div>
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="text-center text-white/20 select-none">
-                  <div className="text-8xl mb-4">{slide.icon}</div>
-                  <div className="text-2xl font-bold mb-2">{slide.title}</div>
-                  <div className="text-lg">{slide.subtitle}</div>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
+    <div className="fixed inset-0 flex flex-col bg-slate-900" style={{ height: '100vh', overflow: 'auto' }}>
+      {/* Home Button */}
+      <button 
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          handleGoHome();
+        }}
+        className="absolute top-4 right-4 z-50 flex items-center text-white hover:text-gray-200 transition-colors bg-slate-800/50 p-2 rounded-full"
+        aria-label="Go to home"
+      >
+        <HomeIcon className="text-2xl" />
+      </button>
+      {/* Video Background */}
+      <div className="fixed inset-0 z-0" style={{ height: '100vh', width: '100vw' }}>
+        <video
+          autoPlay
+          loop
+          muted
+          playsInline
+          className="absolute inset-0 w-full h-full object-cover"
+        >
+          <source src="/Login_background.mp4" type="video/mp4" />
+          {/* Fallback gradient background if video fails to load */}
+          <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900"></div>
+        </video>
+        
+        {/* Video overlay for better text readability */}
+        <div className="absolute inset-0 bg-black/30" style={{ height: '100%' }}></div>
       </div>
 
       {/* Animated particles */}
-      <div className="absolute inset-0 z-0">
+      <div className="fixed inset-0 z-10" style={{ height: '100vh', width: '100vw' }}>
         <div className="particle particle-1"></div>
         <div className="particle particle-2"></div>
         <div className="particle particle-3"></div>
@@ -154,75 +98,70 @@ export function LoginForm({ onToggleToSignup }: LoginFormProps) {
         <div className="particle particle-5"></div>
       </div>
       
-      {/* Theme Selector */}
-      <div className="absolute top-6 right-6 z-10">
-        <div className="bg-white/80 backdrop-blur-sm rounded-xl p-3 shadow-lg border border-white/20">
-          <div className="flex items-center gap-2">
-            <PaletteIcon className="h-4 w-4 text-gray-600" />
-            <div className="flex gap-2">
-              {(Object.keys(colorThemes) as ColorTheme[]).map((themeKey) => (
-                <button
-                  key={themeKey}
-                  onClick={() => setCurrentTheme(themeKey)}
-                  className={`w-6 h-6 rounded-full border-2 transition-all duration-200 ${
-                    currentTheme === themeKey 
-                      ? 'border-gray-800 scale-110' 
-                      : 'border-gray-300 hover:scale-105'
-                  }`}
-                  style={{
-                    background: `linear-gradient(135deg, var(--tw-gradient-stops))`,
-                  }}
-                >
-                  <div className={`w-full h-full rounded-full bg-gradient-to-r ${colorThemes[themeKey].gradient}`}></div>
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
 
       {/* Login Form Container - Centered */}
-      <div className="flex-1 flex items-center justify-center">
-        <div className="w-full max-w-md mx-auto relative z-20">
-          {/* Dark Login Card */}
-          <div className="bg-slate-800/95 backdrop-blur-md rounded-2xl shadow-2xl border border-slate-700/50 overflow-hidden">
+      <div className="flex-1 flex items-center justify-center p-4 relative z-10">
+        <div className="w-full max-w-md relative z-20">
+          {/* Glassmorphism Login Card */}
+          <div className="bg-white/10 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/20 overflow-hidden">
+            {/* Shiny overlay effect */}
+            <div className="absolute inset-0 bg-gradient-to-br from-white/15 via-transparent to-white/5 rounded-3xl"></div>
+            
+            {/* Animated border glow */}
+            <div className="absolute inset-0 rounded-3xl bg-gradient-to-r from-gray-400/20 via-slate-400/20 to-gray-400/20 blur-sm -z-10 animate-pulse"></div>
             
             {/* Logo Section - Inside card */}
-            <div className="pt-8 pb-6 text-center">
-              <div className="mx-auto w-20 h-20 bg-white rounded-xl flex items-center justify-center mb-4 shadow-lg p-2">
+            <div className="pt-4 pb-2 text-center relative z-10">
+              <div className="mx-auto w-16 h-16 bg-white/10 backdrop-blur-md rounded-xl flex items-center justify-center mb-3 shadow-lg border border-white/20">
                 <img 
                   src="/image-removebg-preview.png" 
-                  alt="Company Logo" 
-                  className="w-full h-full object-contain"
+                  alt="KrishiSethu Logo" 
+                  className="w-12 h-12 object-contain"
+                  onError={(e) => {
+                    // Fallback to gradient icon if logo fails to load
+                    e.currentTarget.style.display = 'none';
+                    const nextElement = e.currentTarget.nextElementSibling as HTMLElement;
+                    if (nextElement) {
+                      nextElement.style.display = 'flex';
+                    }
+                  }}
                 />
+                <div className="w-10 h-10 bg-gradient-to-br from-gray-400 to-slate-500 rounded-full items-center justify-center shadow-xl hidden">
+                  <span className="text-white font-bold text-lg">🌾</span>
+                </div>
+              </div>
+              <div className="text-center">
+                <span className="text-xl font-bold text-white drop-shadow-lg">
+                  KrishiSethu
+                </span>
               </div>
             </div>
 
             {/* Welcome Section */}
-            <div className="px-8 pb-6">
-              <h1 className="text-3xl font-bold text-white text-center mb-2">Welcome Back!</h1>
-              <p className="text-slate-300 text-center text-sm mb-8">Sign in to your account</p>
+            <div className="px-6 pb-6 relative z-10">
+              <h1 className="text-2xl font-bold text-white text-center mb-1 drop-shadow-lg">Welcome Back!</h1>
+              <p className="text-white/80 text-center text-sm mb-6 drop-shadow-md">Sign in to your account</p>
 
               {/* Access Method Toggle */}
-              <div className="mb-6">
-                <p className="text-white text-sm font-medium mb-3">Choose Access Method</p>
+              <div className="mb-4">
+                <p className="text-white/90 text-sm font-medium mb-3 drop-shadow-md">Choose Access Method</p>
                 <div className="grid grid-cols-2 gap-3">
                   <button
                     onClick={() => setIsSignIn(true)}
-                    className={`py-3 px-4 rounded-lg font-medium transition-all duration-200 ${
+                    className={`py-3 px-4 rounded-xl font-medium transition-all duration-200 backdrop-blur-md border ${
                       isSignIn 
-                        ? 'bg-emerald-600 text-white shadow-lg' 
-                        : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                        ? 'bg-gradient-to-r from-gray-400 to-slate-500 text-white shadow-lg border-gray-300/50' 
+                        : 'bg-white/10 text-white/80 hover:bg-white/20 border-white/20'
                     }`}
                   >
                     Sign In
                   </button>
                   <button
                     onClick={() => onToggleToSignup?.()}
-                    className={`py-3 px-4 rounded-lg font-medium transition-all duration-200 ${
+                    className={`py-3 px-4 rounded-xl font-medium transition-all duration-200 backdrop-blur-md border ${
                       !isSignIn 
-                        ? 'bg-emerald-600 text-white shadow-lg' 
-                        : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                        ? 'bg-gradient-to-r from-gray-400 to-slate-500 text-white shadow-lg border-gray-300/50' 
+                        : 'bg-white/10 text-white/80 hover:bg-white/20 border-white/20'
                     }`}
                   >
                     Signup
@@ -250,7 +189,7 @@ export function LoginForm({ onToggleToSignup }: LoginFormProps) {
                     })}
                     type="email"
                     autoComplete="email"
-                    className="w-full pl-10 pr-4 py-3 bg-slate-700/50 border border-slate-600 rounded-lg shadow-sm transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 focus:bg-slate-700 hover:bg-slate-700 text-white placeholder-slate-400"
+                    className="w-full pl-10 pr-4 py-3 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl shadow-sm transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:border-gray-400 focus:bg-white/20 hover:bg-white/15 text-white placeholder-white/60"
                     placeholder="Enter your email"
                   />
                 </div>
@@ -278,7 +217,7 @@ export function LoginForm({ onToggleToSignup }: LoginFormProps) {
                     })}
                     type={showPassword ? 'text' : 'password'}
                     autoComplete="current-password"
-                    className="w-full px-4 py-3 pr-12 bg-slate-700/50 border border-slate-600 rounded-lg shadow-sm transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 focus:bg-slate-700 hover:bg-slate-700 text-white placeholder-slate-400"
+                    className="w-full px-4 py-3 pr-12 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl shadow-sm transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:border-gray-400 focus:bg-white/20 hover:bg-white/15 text-white placeholder-white/60"
                     placeholder="Enter your password"
                   />
                   <button
@@ -306,13 +245,14 @@ export function LoginForm({ onToggleToSignup }: LoginFormProps) {
                 <label className="flex items-center">
                   <input
                     type="checkbox"
-                    className="w-4 h-4 text-emerald-600 bg-slate-700 border-slate-600 rounded focus:ring-emerald-500 focus:ring-2"
+                    className="w-4 h-4 text-gray-400 bg-white/10 border-white/20 rounded focus:ring-gray-400 focus:ring-2"
                   />
-                  <span className="ml-2 text-slate-300">Remember me</span>
+                  <span className="ml-2 text-white/80">Remember me</span>
                 </label>
                 <button
                   type="button"
-                  className="text-emerald-400 hover:text-emerald-300 font-medium transition-colors"
+                  onClick={() => setShowForgotPassword(true)}
+                  className="text-gray-400 hover:text-gray-300 font-medium transition-colors"
                 >
                   Forgot password?
                 </button>
@@ -322,11 +262,11 @@ export function LoginForm({ onToggleToSignup }: LoginFormProps) {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-3 px-4 rounded-lg font-medium shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 transform hover:scale-[1.01] active:scale-[0.99] mt-6"
+                className="w-full bg-gradient-to-r from-gray-500 to-slate-600 hover:from-gray-600 hover:to-slate-700 text-white py-3 px-4 rounded-xl font-bold shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2 focus:ring-offset-transparent disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 transform hover:scale-[1.02] active:scale-[0.98] mt-6 backdrop-blur-md border border-gray-400/50"
               >
                 {loading ? (
                   <div className="flex items-center justify-center gap-2">
-                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                    <div className="w-5 h-5 border-2 border-black/30 border-t-black rounded-full animate-spin"></div>
                     Signing in...
                   </div>
                 ) : (
@@ -337,12 +277,12 @@ export function LoginForm({ onToggleToSignup }: LoginFormProps) {
               </button>
 
               {/* Signup Link */}
-              <div className="mt-6 text-center pb-8">
-                <p className="text-slate-400 text-sm">
+              <div className="mt-4 text-center pb-6">
+                <p className="text-white/70 text-sm drop-shadow-md">
                   Don't have an account?{' '}
                   <button
                     type="button"
-                    className="text-blue-400 hover:text-blue-300 font-medium transition-colors"
+                    className="text-gray-400 hover:text-gray-300 font-medium transition-colors"
                     onClick={() => onToggleToSignup?.()}
                   >
                     Signup
@@ -371,11 +311,14 @@ export function LoginForm({ onToggleToSignup }: LoginFormProps) {
             />
           </div>
           
-          {/* Floating Elements */}
-          <div className={`absolute top-1/4 -left-8 w-12 h-12 bg-gradient-to-r ${theme.gradient} rounded-full opacity-10 animate-pulse`}></div>
-          <div className={`absolute bottom-1/4 -right-8 w-16 h-16 bg-gradient-to-r ${theme.gradient} rounded-full opacity-10 animate-pulse delay-1000`}></div>
         </div>
       </div>
+
+      {/* Forgot Password Modal */}
+      <ForgotPasswordModal 
+        isOpen={showForgotPassword}
+        onClose={() => setShowForgotPassword(false)}
+      />
     </div>
   );
 }

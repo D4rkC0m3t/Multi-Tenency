@@ -1,0 +1,234 @@
+@import url("https://fonts.cdnfonts.com/css/devil-breeze");
+@import url("https://fonts.cdnfonts.com/css/poppins");
+
+.section {
+  width: 100%;
+  min-height: 100vh;
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.content-fit {
+  width: min(1200px, 90vw);
+  margin: auto;
+  min-height: 100vh;
+  position: relative;
+  padding-block: 10em;
+}
+
+#banner .title {
+  color: #d1ff48;
+  font-size: 11em;
+  font-family: "devil breeze";
+  font-weight: bold;
+  position: relative;
+  overflow: visible;
+  text-align: center;
+}
+
+#banner .title::before {
+  content: attr(data-before);
+  position: absolute;
+  z-index: -1;
+  color: oklch(0.78 0.17 80.01 / 0.19);
+  mask: linear-gradient(
+    to bottom,
+    #000 -80%,
+    oklch(0 0 0/0),
+    #000,
+    oklch(0 0 0/0) 200%
+  );
+  transform: scaleY(-1) translateY(-0.44lh);
+}
+
+.section .decorate {
+  position: fixed;
+  z-index: -100;
+  pointer-events: none;
+}
+
+#intro .content-fit {
+  display: flex;
+  gap: 30%;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.section .number {
+  font-family: "devil breeze";
+  font-size: 15em;
+  font-weight: bold;
+}
+
+.section .content-fit .title {
+  font-family: "devil breeze";
+  font-size: 5em;
+  font-weight: bold;
+}
+
+#description .content-fit {
+  padding-right: 30%;
+}
+
+#description .number {
+  font-size: 5em;
+}
+
+#description .title {
+  font-size: 7em;
+  font-weight: 500;
+}
+
+#contact .content-fit {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-direction: column;
+  text-align: center;
+}
+
+#contact table {
+  width: min(800px, 90vw);
+  padding-top: 2em;
+  font-size: 2em;
+  margin: auto;
+}
+
+#contact table td {
+  padding-block: 0.5em;
+  border-bottom: 1px dashed #445022;
+}
+
+#contact table td:nth-child(1) {
+  text-align: left;
+  font-weight: 500;
+}
+
+#contact table td:nth-child(2) {
+  text-align: right;
+  font-weight: 200;
+}
+
+#contact .sign {
+  font-size: 10em;
+  font-family: "devil breeze";
+  font-weight: bold;
+  color: #d1ff48;
+}
+
+#container3D {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  pointer-events: none;
+}
+
+/* Floating animation for background elements */
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+    opacity: 0.3;
+  }
+  50% {
+    transform: translateY(-20px) rotate(180deg);
+    opacity: 0.6;
+  }
+}
+
+/* Additional background texture overlays */
+.section::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background:
+    radial-gradient(circle at 20% 80%, rgba(209, 255, 72, 0.03) 0%, transparent 50%),
+    radial-gradient(circle at 80% 20%, rgba(115, 129, 75, 0.05) 0%, transparent 50%),
+    radial-gradient(circle at 40% 40%, rgba(209, 255, 72, 0.02) 0%, transparent 50%);
+  pointer-events: none;
+  z-index: -50;
+}
+
+/* Particle-like dots scattered across sections */
+.section::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image:
+    radial-gradient(2px 2px at 20px 30px, rgba(209, 255, 72, 0.2), transparent),
+    radial-gradient(2px 2px at 40px 70px, rgba(115, 129, 75, 0.3), transparent),
+    radial-gradient(1px 1px at 90px 40px, rgba(209, 255, 72, 0.4), transparent),
+    radial-gradient(1px 1px at 130px 80px, rgba(115, 129, 75, 0.2), transparent),
+    radial-gradient(2px 2px at 160px 30px, rgba(209, 255, 72, 0.1), transparent);
+  background-repeat: repeat;
+  background-size: 200px 100px;
+  pointer-events: none;
+  z-index: -40;
+  opacity: 0.6;
+}
+
+/* Organic vine-like patterns */
+#banner::before {
+  background-image:
+    linear-gradient(45deg, transparent 40%, rgba(209, 255, 72, 0.05) 50%, transparent 60%),
+    linear-gradient(-45deg, transparent 40%, rgba(115, 129, 75, 0.08) 50%, transparent 60%);
+}
+
+/* Additional organic textures for different sections */
+#intro::before {
+  background-image:
+    radial-gradient(ellipse at top left, rgba(209, 255, 72, 0.04) 0%, transparent 50%),
+    radial-gradient(ellipse at bottom right, rgba(115, 129, 75, 0.06) 0%, transparent 50%);
+}
+
+#description::before {
+  background-image:
+    conic-gradient(from 45deg at 30% 70%, transparent 0deg, rgba(209, 255, 72, 0.03) 90deg, transparent 180deg),
+    radial-gradient(circle at 80% 20%, rgba(115, 129, 75, 0.05) 0%, transparent 60%);
+}
+
+#contact::before {
+  background-image:
+    radial-gradient(ellipse at center, rgba(209, 255, 72, 0.06) 0%, transparent 70%),
+    linear-gradient(135deg, transparent 30%, rgba(115, 129, 75, 0.04) 50%, transparent 70%);
+}
+
+@media screen and (max-width: 1023px) {
+  #banner .title {
+    font-size: 5em;
+  }
+  #intro .content-fit {
+    flex-direction: column;
+  }
+}
+
+@media screen and (max-width: 767px) {
+  #banner .title {
+    font-size: 3em;
+  }
+  #intro .content-fit {
+    flex-direction: column;
+  }
+  .section .number {
+    font-size: 5em;
+  }
+  .section .content-fit .title {
+    font-size: 2em;
+  }
+  #description .content-fit {
+    padding-right: 0;
+  }
+  #contact table {
+    font-size: 1em;
+  }
+  #contact .sign {
+    font-size: 2em;
+  }
+}
