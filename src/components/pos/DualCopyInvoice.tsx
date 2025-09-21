@@ -183,11 +183,25 @@ interface DualCopyInvoiceProps {
   companyAddress: string;
   companyGSTIN: string;
   companyLogo?: string;
+  companyPhone?: string;
+  companyEmail?: string;
+  // License Information
+  fertilizerLicense?: string;
+  seedLicense?: string;
+  pesticideLicense?: string;
+  dealerRegistration?: string;
   invoiceNumber: string;
   invoiceDate: string;
+  invoiceTitle?: string;
   customerName: string;
   customerAddress: string;
+  customerPhone?: string;
   customerGSTIN?: string;
+  customerVillage?: string;
+  customerDistrict?: string;
+  customerState?: string;
+  customerPincode?: string;
+  customerType?: string;
   items: InvoiceItem[];
   totalAmount: number;
   amountInWords: string;
@@ -207,6 +221,13 @@ const InvoiceSection: React.FC<{
       {/* Copy Label at Top */}
       <Text style={styles.copyLabel}>{copyType}</Text>
       
+      {/* Invoice Title */}
+      {data.invoiceTitle && (
+        <Text style={[styles.companyName, { textAlign: 'center', marginBottom: 5, color: '#d97706' }]}>
+          {data.invoiceTitle}
+        </Text>
+      )}
+      
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.companyInfo}>
@@ -219,28 +240,73 @@ const InvoiceSection: React.FC<{
             <Text style={styles.companyName}>{data.companyName}</Text>
             <Text style={styles.invoiceText}>{data.companyAddress}</Text>
             <Text style={styles.invoiceText}>GSTIN: {data.companyGSTIN}</Text>
+            {data.companyPhone && (
+              <Text style={styles.invoiceText}>Phone: {data.companyPhone}</Text>
+            )}
+            {data.companyEmail && (
+              <Text style={styles.invoiceText}>Email: {data.companyEmail}</Text>
+            )}
+            {/* License Information - HORIZONTAL FORMAT APPLIED */}
+            {(data.fertilizerLicense || data.seedLicense || data.pesticideLicense || data.dealerRegistration) && (
+              <Text style={[styles.invoiceText, { marginTop: 2, backgroundColor: '#f0f0f0', padding: 1 }]}>
+                Licenses: {[
+                  data.fertilizerLicense && `Fertilizer: ${data.fertilizerLicense}`,
+                  data.seedLicense && `Seed: ${data.seedLicense}`,
+                  data.pesticideLicense && `Pesticide: ${data.pesticideLicense}`,
+                  data.dealerRegistration && `Dealer: ${data.dealerRegistration}`
+                ].filter(Boolean).join(' | ')}
+              </Text>
+            )}
           </View>
         </View>
         <View style={styles.invoiceInfo}>
           <View style={styles.invoiceDetails}>
             <Text style={styles.invoiceText}>Invoice No: {data.invoiceNumber}</Text>
             <Text style={styles.invoiceText}>Date: {data.invoiceDate}</Text>
-            <Text style={styles.invoiceText}>Customer: {data.customerName}</Text>
-            {data.customerGSTIN && (
-              <Text style={styles.invoiceText}>Customer GSTIN: {data.customerGSTIN}</Text>
-            )}
-            <Text style={styles.invoiceText}>Payment: {data.paymentMethod}</Text>
-          </View>
-          {data.qrCodeData && (
-            <View style={styles.qrContainer}>
-              <Text style={[styles.invoiceText, { fontSize: 7, marginBottom: 2 }]}>Scan to Pay</Text>
-              <Image 
-                style={styles.qrCode} 
-                src={data.qrCodeData}
-              />
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end' }}>
+              <View style={{ marginRight: 10 }}>
+                <Text style={styles.invoiceText}>Payment: {data.paymentMethod}</Text>
+                {data.qrCodeData && (
+                  <Text style={[styles.invoiceText, { fontSize: 7, marginTop: 2 }]}>Scan to Pay</Text>
+                )}
+              </View>
+              {data.qrCodeData && (
+                <Image 
+                  style={{ width: 50, height: 50 }} 
+                  src={data.qrCodeData}
+                />
+              )}
             </View>
+          </View>
+        </View>
+      </View>
+      
+      {/* Customer Details Section */}
+      <View style={{ marginBottom: 8, padding: 8, backgroundColor: '#f9f9f9', borderRadius: 4 }}>
+        <Text style={[styles.invoiceText, { fontWeight: 'bold', marginBottom: 4 }]}>Bill To:</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 2 }}>
+          <Text style={[styles.invoiceText, { fontWeight: 'bold', marginRight: 8 }]}>{data.customerName}</Text>
+          {data.customerType && (
+            <Text style={[styles.invoiceText, { backgroundColor: '#e5e7eb', padding: 2, borderRadius: 2, fontSize: 7, fontWeight: 'bold', textTransform: 'uppercase' }]}>
+              {data.customerType}
+            </Text>
           )}
         </View>
+        {/* All Customer Details - Single Horizontal Line */}
+        <Text style={styles.invoiceText}>
+          {[
+            data.customerAddress,
+            data.customerVillage && `Village: ${data.customerVillage}`,
+            data.customerPhone && `Phone: ${data.customerPhone}`,
+            data.customerPincode && `PIN: ${data.customerPincode}`,
+            data.customerDistrict && data.customerState && `${data.customerDistrict}, ${data.customerState}`
+          ].filter(Boolean).join(' • ')}
+        </Text>
+        
+        {/* GSTIN on separate line if available */}
+        {data.customerGSTIN && (
+          <Text style={styles.invoiceText}>GSTIN: {data.customerGSTIN}</Text>
+        )}
       </View>
 
     {/* Products Table */}
@@ -285,15 +351,21 @@ const InvoiceSection: React.FC<{
     </View>
 
 
-    {/* Total Amount Line */}
-    <View style={styles.totalSection}>
-      <Text style={styles.totalText}>Total: ₹{(data.totalAmount || 0).toFixed(2)}</Text>
+    {/* Total Amount Section with Amount in Words */}
+    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: 8, paddingTop: 5, borderTopWidth: 1, borderTopColor: '#ddd' }}>
+      <View style={{ flex: 2, paddingRight: 10 }}>
+        <Text style={[styles.footerText, { fontWeight: 'bold', marginBottom: 2 }]}>Amount in words:</Text>
+        <Text style={styles.footerText}>{data.amountInWords}</Text>
+      </View>
+      <View style={{ flex: 1, alignItems: 'flex-end' }}>
+        <Text style={styles.totalText}>Total: ₹{(data.totalAmount || 0).toFixed(2)}</Text>
+      </View>
     </View>
 
     {/* Footer Details */}
     <View style={styles.footer}>
       <Text style={styles.footerText}>
-        Amount in words: {data.amountInWords}    Payment Method: {data.paymentMethod}    Authorized Signatory
+        Payment Method: {data.paymentMethod}    Authorized Signatory
       </Text>
     </View>
 

@@ -21,6 +21,8 @@ import { BatchSelectionDialog } from './BatchSelectionDialog';
 import DualCopyInvoice from './DualCopyInvoice';
 // import { convertToWords } from '../../lib/numberToWords'; // Temporarily disabled
 import toast from 'react-hot-toast';
+import { calculateTotalWithGST, calculateGSTBreakdown, getGSTStateCode } from '../../utils/gstCalculations';
+import { determineInvoiceType, formatInvoiceTitleForDisplay, getInvoiceTypeDescription } from '../../utils/invoiceTitles';
 
 interface BatchSelection {
   batch_id: string;
@@ -198,7 +200,7 @@ const POSPage = () => {
           ? { 
               ...item, 
               quantity: newQuantity,
-              paid: paid !== undefined ? paid : item.paid
+              paymentStatus: paid !== undefined ? paid : item.paymentStatus
             }
           : item
       )
@@ -364,8 +366,52 @@ const POSPage = () => {
 
   // Helper function to convert number to words
   const convertToWords = (amount: number): string => {
-    // Simple implementation - you can enhance this
-    return `Rupees ${Math.floor(amount)} Only`;
+    const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'];
+    const teens = ['Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+    const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+    
+    const convertHundreds = (n: number): string => {
+      let result = '';
+      if (n >= 100) {
+        result += ones[Math.floor(n / 100)] + ' Hundred ';
+        n %= 100;
+      }
+      if (n >= 20) {
+        result += tens[Math.floor(n / 10)] + ' ';
+        n %= 10;
+      } else if (n >= 10) {
+        result += teens[n - 10] + ' ';
+        return result;
+      }
+      if (n > 0) {
+        result += ones[n] + ' ';
+      }
+      return result;
+    };
+    
+    if (amount === 0) return 'Zero Rupees Only';
+    
+    const integerPart = Math.floor(amount);
+    const decimalPart = Math.round((amount - integerPart) * 100);
+    
+    let result = '';
+    const crores = Math.floor(integerPart / 10000000);
+    const lakhs = Math.floor((integerPart % 10000000) / 100000);
+    const thousands = Math.floor((integerPart % 100000) / 1000);
+    const hundreds = integerPart % 1000;
+    
+    if (crores > 0) result += convertHundreds(crores) + 'Crore ';
+    if (lakhs > 0) result += convertHundreds(lakhs) + 'Lakh ';
+    if (thousands > 0) result += convertHundreds(thousands) + 'Thousand ';
+    if (hundreds > 0) result += convertHundreds(hundreds);
+    
+    result = result.trim() + ' Rupees';
+    
+    if (decimalPart > 0) {
+      result += ' and ' + convertHundreds(decimalPart).trim() + ' Paise';
+    }
+    
+    return result + ' Only';
   };
 
   const handleCheckout = async () => {
@@ -422,20 +468,53 @@ const POSPage = () => {
     
     setProcessingCheckout(true);
     try {
-      console.log('Starting sale completion...', { merchant: merchant.id, cartItems: cart.length, total });
+      console.log('Starting sale completion...', { merchant: merchant.id, cartItems: cart.length, total: cartTotal });
       
-      // Create sale record
+      // Determine invoice type based on GST rules
+      const merchantGSTInfo = {
+        gstRegistrationType: (merchant as any)?.gst_registration_type || 'regular',
+        compositionDealer: (merchant as any)?.composition_dealer || false,
+        exemptSupplies: (merchant as any)?.exempt_supplies || false,
+        gstin: (merchant as any)?.gst_number || merchant?.gstin
+      };
+      
+      const customerGSTInfo = {
+        gstin: selectedCustomerData?.gstin || selectedCustomerData?.gst_number
+      };
+      
+      const invoiceTypeInfo = determineInvoiceType(merchantGSTInfo, customerGSTInfo, cartTotal);
+      
+      // Create sale record with proper GST breakdown and invoice type
+      // Check if GST is applicable (GST rate > 0)
+      const isGstApplicable = customGstRate > 0;
+      
+      // Base sale data
       const saleData = {
-        merchant_id: merchant.id,
+        merchant_id: merchant?.id,
         customer_id: selectedCustomer || null,
         invoice_number: invoiceNumber,
+        total_amount: cartTotal,
+        paid_amount: paymentMethod === 'credit' ? 0 : cartTotal,
         payment_method: paymentMethod,
-        total_amount: total,
         payment_status: paymentMethod === 'credit' ? 'pending' : 'paid',
         sale_date: new Date().toISOString().split('T')[0], // Format as YYYY-MM-DD for DATE column
-        subtotal: total / 1.18, // Calculate subtotal (assuming 18% GST)
-        tax_amount: total - (total / 1.18), // Calculate tax amount
-        discount_amount: discountType === 'percentage' ? (total * discount / 100) : discount
+        subtotal: cartSubtotal,
+        tax_amount: cartGstAmount,
+        discount_amount: cartDiscountAmount,
+        // Invoice type fields
+        invoice_type: invoiceTypeInfo.type,
+        invoice_title: invoiceTypeInfo.title,
+        eway_bill_required: invoiceTypeInfo.ewayRequired,
+        movement_value: cartTotal,
+        // Conditionally add GST-related fields only if GST is applicable
+        ...(isGstApplicable && {
+          cgst_amount: gstBreakdown.cgstAmount,
+          sgst_amount: gstBreakdown.sgstAmount,
+          igst_amount: gstBreakdown.igstAmount,
+          is_interstate: gstBreakdown.isInterstate,
+          customer_state_code: selectedCustomerData?.state_code || null,
+          merchant_state_code: merchant?.state_code || null
+        })
       };
 
       console.log('Inserting sale data:', saleData);
@@ -562,9 +641,6 @@ const POSPage = () => {
     setShowQRCode(true);
   };
 
-  const handleRemoveItem = (item: CartItem) => {
-    setCart(cart.filter(cartItem => cartItem !== item));
-  };
 
   const handleCustomerSelect = (customer: Customer) => {
     setSelectedCustomer(customer.id);
@@ -679,13 +755,19 @@ const POSPage = () => {
         signedQRCode: qrCodeBase64,
         
         // Company Details
-        companyName: merchant?.business_name || merchant?.name || 'Your Company Name',
-        companyAddress: [merchant?.address || 'Your Company Address'],
-        gstin: (merchant as any)?.gst_number || 'GSTIN123456789',
+        companyName: merchant?.name || 'Business Name',
+        companyAddress: [merchant?.address || 'Business Address'],
+        companyLogo: (merchant?.settings as any)?.logo_data || (merchant?.settings as any)?.logo_url || `${window.location.origin}/Logo_Dashboard.png`,
+        gstin: (merchant as any)?.gst_number || merchant?.gstin || 'GSTIN Not Available',
         stateName: merchant?.state || 'Maharashtra',
-        stateCode: '27',
-        mobile: merchant?.phone || '1234567890',
-        email: merchant?.email || 'your.email@example.com',
+        stateCode: getGSTStateCode(merchant?.state || 'Maharashtra'),
+        mobile: merchant?.phone || '',
+        email: merchant?.email || '',
+        
+        // Fertilizer Licensing Details
+        fertilizerLicense: (merchant as any)?.fertilizer_license || '',
+        seedLicense: (merchant as any)?.seed_license || '',
+        pesticideLicense: (merchant as any)?.pesticide_license || '',
         
         // Invoice Details
         invoiceNo: sale.invoice_number || `INV-${Date.now()}`,
@@ -693,40 +775,60 @@ const POSPage = () => {
         
         // Buyer Details
         buyerName: customer?.name || 'Walk-in Customer',
-        buyerAddress: [customer?.address || 'N/A'],
+        buyerAddress: [
+          customer?.address || '',
+          customer?.village ? `Village: ${customer.village}` : '',
+          customer?.district && customer?.state ? `${customer.district}, ${customer.state}` : '',
+          customer?.pincode ? `PIN: ${customer.pincode}` : ''
+        ].filter(Boolean),
+        buyerGstin: customer?.gstin || customer?.gst_number || '',
+        buyerStateName: customer?.state || '',
+        buyerStateCode: getGSTStateCode(customer?.state || ''),
+        buyerMobile: customer?.phone || '',
+        buyerContactDetails: customer?.phone || '',
         
         // Items
-        items: saleItems.map((item, index) => ({
-          sr: index + 1,
-          description: item.product.name,
-          hsn: (item.product as any)?.hsn_code || '31054000',
-          gst: 18,
-          qty: item.quantity,
-          unit: item.product.unit || 'KG',
-          rate: item.unit_price || 0,
-          amount: item.total_price || 0,
-          cgstAmount: (item.total_price || 0) * 0.09,
-          sgstAmount: (item.total_price || 0) * 0.09,
-          igstAmount: 0,
-          lotBatch: item.product.batch_number || '',
-          mfgDate: item.product.manufacturing_date || '',
-          expiryDate: item.product.expiry_date || '',
-          manufacturer: item.product.manufacturer || '',
-          packingDetails: item.product.packing_details || ''
-        })),
+        items: saleItems.map((item, index) => {
+          const itemAmount = item.total_price || 0;
+          const itemTaxAmount = (itemAmount * 18) / 118; // Extract tax from inclusive amount
+          const itemGstBreakdown = calculateGSTBreakdown(
+            itemTaxAmount,
+            merchant?.state || 'Maharashtra',
+            customer?.state || merchant?.state || 'Maharashtra'
+          );
+          
+          return {
+            sr: index + 1,
+            description: item.product.name,
+            hsn: (item.product as any)?.hsn_code || '31054000',
+            gst: 18,
+            qty: item.quantity,
+            unit: item.product.unit || 'KG',
+            rate: item.unit_price || 0,
+            amount: itemAmount,
+            cgstAmount: itemGstBreakdown.cgstAmount,
+            sgstAmount: itemGstBreakdown.sgstAmount,
+            igstAmount: itemGstBreakdown.igstAmount,
+            lotBatch: item.product.batch_number || '',
+            mfgDate: item.product.manufacturing_date || '',
+            expiryDate: item.product.expiry_date || '',
+            manufacturer: item.product.manufacturer || '',
+            packingDetails: item.product.packing_details || ''
+          };
+        }),
         
-        // Tax Summary
+        // Tax Summary with proper GST breakdown
         hsnSac: '31054000',
         taxableValue: sale.subtotal || (sale.total_amount / 1.18),
         gstRate: 18,
         gstAmount: sale.tax_amount || (sale.total_amount / 1.18) * 0.18,
-        cgstAmount: sale.tax_amount ? sale.tax_amount / 2 : (sale.total_amount / 1.18) * 0.09,
-        sgstAmount: sale.tax_amount ? sale.tax_amount / 2 : (sale.total_amount / 1.18) * 0.09,
-        igstAmount: 0,
+        cgstAmount: sale.cgst_amount || 0,
+        sgstAmount: sale.sgst_amount || 0,
+        igstAmount: sale.igst_amount || 0,
         taxAmount: sale.tax_amount || (sale.total_amount / 1.18) * 0.18,
         roundOff: 0,
         invoiceTotal: sale.total_amount || 0,
-        isInterstate: false,
+        isInterstate: sale.is_interstate || false,
         
         // Amount in Words
         amountInWords: `Rupees ${convertToWords(sale.total_amount || 0)} Only`,
@@ -767,6 +869,44 @@ const POSPage = () => {
       toast.error(`Failed to generate invoice: ${errorMessage}`);
     }
   };
+
+  // Calculate totals with GST breakdown
+  const cartSubtotal = cart.reduce((sum, item) => sum + (item.product.sale_price || 0) * item.quantity, 0);
+  const cartDiscountAmount = discountType === 'percentage' ? (cartSubtotal * discount) / 100 : discount;
+  const cartTaxableAmount = cartSubtotal - cartDiscountAmount;
+  
+  // Get merchant and customer states for GST calculation
+  const merchantState = merchant?.state || 'Maharashtra';
+  const selectedCustomerData = customers.find(c => c.id === selectedCustomer);
+  const customerState = selectedCustomerData?.state || merchantState; // Default to same state if no customer selected
+  
+  // Calculate GST breakdown based on states
+  const gstCalculation = calculateTotalWithGST(
+    cartSubtotal,
+    customGstRate,
+    merchantState,
+    customerState,
+    cartDiscountAmount
+  );
+  
+  const { gstBreakdown } = gstCalculation;
+  const cartGstAmount = gstBreakdown.totalGstAmount;
+  const cartTotal = cartTaxableAmount + cartGstAmount;
+  
+  // Determine invoice type for display
+  const merchantGSTInfo = {
+    gstRegistrationType: (merchant as any)?.gst_registration_type || 'regular',
+    compositionDealer: (merchant as any)?.composition_dealer || false,
+    exemptSupplies: (merchant as any)?.exempt_supplies || false,
+    gstin: (merchant as any)?.gst_number || merchant?.gstin
+  };
+  
+  const customerGSTInfo = {
+    gstin: selectedCustomerData?.gstin || selectedCustomerData?.gst_number
+  };
+  
+  const invoiceTypeInfo = determineInvoiceType(merchantGSTInfo, customerGSTInfo, cartTotal);
+  const invoiceDisplay = formatInvoiceTitleForDisplay(invoiceTypeInfo.type);
 
   if (loading) {
     return (
@@ -1614,24 +1754,43 @@ const POSPage = () => {
                   <Stack spacing={1}>
                     <Box display="flex" justifyContent="space-between">
                       <Typography variant="body2" color="text.secondary">Subtotal:</Typography>
-                      <Typography variant="body2" fontWeight="600">₹{subtotal.toFixed(2)}</Typography>
+                      <Typography variant="body2" fontWeight="600">₹{cartSubtotal.toFixed(2)}</Typography>
                     </Box>
                     {discount > 0 && (
                       <Box display="flex" justifyContent="space-between">
                         <Typography variant="body2" color="text.secondary">
                           Discount ({discountType === 'percentage' ? `${discount}%` : `₹${discount}`}):
                         </Typography>
-                        <Typography variant="body2" fontWeight="600" color="error.main">-₹{discountAmount.toFixed(2)}</Typography>
+                        <Typography variant="body2" fontWeight="600" color="error.main">-₹{cartDiscountAmount.toFixed(2)}</Typography>
                       </Box>
                     )}
+                    {customGstRate > 0 && (
+                      gstBreakdown.isInterstate ? (
+                        <Box display="flex" justifyContent="space-between">
+                          <Typography variant="body2" color="text.secondary">IGST ({customGstRate}%):</Typography>
+                          <Typography variant="body2" fontWeight="600">₹{gstBreakdown.igstAmount.toFixed(2)}</Typography>
+                        </Box>
+                      ) : (
+                        <>
+                          <Box display="flex" justifyContent="space-between">
+                            <Typography variant="body2" color="text.secondary">CGST ({customGstRate/2}%):</Typography>
+                            <Typography variant="body2" fontWeight="600">₹{gstBreakdown.cgstAmount.toFixed(2)}</Typography>
+                          </Box>
+                          <Box display="flex" justifyContent="space-between">
+                            <Typography variant="body2" color="text.secondary">SGST ({customGstRate/2}%):</Typography>
+                            <Typography variant="body2" fontWeight="600">₹{gstBreakdown.sgstAmount.toFixed(2)}</Typography>
+                          </Box>
+                        </>
+                      )
+                    )}
                     <Box display="flex" justifyContent="space-between">
-                      <Typography variant="body2" color="text.secondary">GST ({customGstRate}%):</Typography>
-                      <Typography variant="body2" fontWeight="600">₹{gstAmount.toFixed(2)}</Typography>
+                      <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 600 }}>Total GST:</Typography>
+                      <Typography variant="body2" fontWeight="600" color="primary.main">₹{cartGstAmount.toFixed(2)}</Typography>
                     </Box>
                     <Divider />
                     <Box display="flex" justifyContent="space-between">
                       <Typography variant="h6" fontWeight="700" color="primary.main">Total:</Typography>
-                      <Typography variant="h6" fontWeight="700" color="primary.main">₹{total.toFixed(2)}</Typography>
+                      <Typography variant="h6" fontWeight="700" color="primary.main">₹{cartTotal.toFixed(2)}</Typography>
                     </Box>
                   </Stack>
                 </Paper>
@@ -1715,10 +1874,26 @@ const POSPage = () => {
       {/* Checkout Dialog */}
       <Dialog open={showCheckoutDialog} onClose={() => setShowCheckoutDialog(false)} maxWidth="sm" fullWidth>
         <DialogTitle>
-          <Box display="flex" alignItems="center">
-            <PaymentIcon sx={{ mr: 1 }} />
-            Complete Sale - {invoiceNumber}
+          <Box display="flex" alignItems="center" justifyContent="space-between">
+            <Box display="flex" alignItems="center">
+              <PaymentIcon sx={{ mr: 1 }} />
+              Complete Sale - {invoiceNumber}
+            </Box>
+            <Chip 
+              label={invoiceDisplay.title}
+              sx={{ 
+                backgroundColor: invoiceDisplay.color + '20',
+                color: invoiceDisplay.color,
+                fontWeight: 600,
+                fontSize: '0.75rem'
+              }}
+            />
           </Box>
+          {invoiceDisplay.subtitle && (
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+              {invoiceDisplay.subtitle}
+            </Typography>
+          )}
         </DialogTitle>
         <DialogContent>
           <Stack spacing={3} sx={{ mt: 1 }}>
@@ -1797,19 +1972,67 @@ const POSPage = () => {
               <Stack spacing={1}>
                 <Box display="flex" justifyContent="space-between">
                   <Typography>Subtotal:</Typography>
-                  <Typography>₹{subtotal.toFixed(2)}</Typography>
+                  <Typography>₹{cartSubtotal.toFixed(2)}</Typography>
                 </Box>
                 
-                {discountAmount > 0 && (
+                {cartDiscountAmount > 0 && (
                   <Box display="flex" justifyContent="space-between" color="success.main">
                     <Typography>Discount:</Typography>
-                    <Typography>-₹{discountAmount.toFixed(2)}</Typography>
+                    <Typography>-₹{cartDiscountAmount.toFixed(2)}</Typography>
+                  </Box>
+                )}
+                
+                {/* GST Breakdown - Only show if GST is applicable */}
+                {customGstRate > 0 && (
+                  gstBreakdown.isInterstate ? (
+                    <Box display="flex" justifyContent="space-between">
+                      <Typography>IGST ({customGstRate}%):</Typography>
+                      <Typography>₹{gstBreakdown.igstAmount.toFixed(2)}</Typography>
+                    </Box>
+                  ) : (
+                    <>
+                      <Box display="flex" justifyContent="space-between">
+                        <Typography>CGST ({customGstRate/2}%):</Typography>
+                        <Typography>₹{gstBreakdown.cgstAmount.toFixed(2)}</Typography>
+                      </Box>
+                      <Box display="flex" justifyContent="space-between">
+                        <Typography>SGST ({customGstRate/2}%):</Typography>
+                        <Typography>₹{gstBreakdown.sgstAmount.toFixed(2)}</Typography>
+                      </Box>
+                    </>
+                  )
+                )}
+                
+                {/* Invoice Type Information */}
+                <Box display="flex" justifyContent="space-between">
+                  <Typography variant="caption" color="text.secondary">
+                    Invoice Type: {invoiceTypeInfo.type.replace('_', ' ').toUpperCase()}
+                  </Typography>
+                  {customGstRate > 0 && (
+                    <Typography variant="caption" color="text.secondary">
+                      {gstBreakdown.isInterstate ? 'Inter-state' : 'Intra-state'}
+                    </Typography>
+                  )}
+                </Box>
+                
+                {invoiceTypeInfo.ewayRequired && (
+                  <Box display="flex" justifyContent="center" sx={{ mt: 1 }}>
+                    <Chip 
+                      label="E-WAY BILL REQUIRED"
+                      color="warning"
+                      size="small"
+                      sx={{ fontWeight: 600 }}
+                    />
                   </Box>
                 )}
                 
                 <Box display="flex" justifyContent="space-between">
-                  <Typography>GST (18%):</Typography>
-                  <Typography>₹{gstAmount.toFixed(2)}</Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {merchantState} → {customerState}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {getInvoiceTypeDescription(invoiceTypeInfo.type)}
+                  </Typography>
                 </Box>
                 
                 <Divider />
@@ -1817,7 +2040,7 @@ const POSPage = () => {
                 <Box display="flex" justifyContent="space-between">
                   <Typography variant="h6" fontWeight="bold">Total:</Typography>
                   <Typography variant="h6" fontWeight="bold" color="primary">
-                    ₹{total.toFixed(2)}
+                    ₹{cartTotal.toFixed(2)}
                   </Typography>
                 </Box>
               </Stack>
@@ -1872,9 +2095,25 @@ const POSPage = () => {
           <Button 
             variant="contained" 
             color="primary"
-            onClick={() => {
-              // PDF download functionality to be implemented
-              console.log('Download invoice:', qrCodeData?.number);
+            onClick={async () => {
+              if (!qrCodeData) return;
+              
+              try {
+                // Use stored sale data instead of current cart (which is empty)
+                if (!lastSaleData) {
+                  toast.error('No sale data available for invoice generation');
+                  return;
+                }
+                
+                // Re-generate the exact format invoice using the same data from completeSale
+                const saleForInvoice = lastSaleData.sale;
+                await generateInvoice(saleForInvoice);
+                
+                toast.success('Invoice downloaded successfully!');
+              } catch (error) {
+                console.error('Error downloading invoice:', error);
+                toast.error('Failed to download invoice');
+              }
             }}
             sx={{ mr: 1 }}
           >
@@ -1895,34 +2134,66 @@ const POSPage = () => {
                 
                 const { cartItems, customerData, totals, gstRate, paymentMethod: salePaymentMethod, qrCodeImage } = lastSaleData;
                 
-                // Prepare invoice data
+                // Use the stored customer data from lastSaleData instead of trying to find it again
+                const fullCustomerData = customerData;
+                
+                // Prepare invoice data with complete merchant and customer information
                 const companyLogo = (merchant?.settings as any)?.logo_data || (merchant?.settings as any)?.logo_url || `${window.location.origin}/Logo_Dashboard.png`;
                 const invoiceData = {
-                  companyName: merchant?.business_name || merchant?.name || 'Business Name',
+                  // Company Information
+                  companyName: merchant?.name || 'Business Name',
                   companyAddress: merchant?.address || 'Business Address',
                   companyGSTIN: (merchant as any)?.gst_number || merchant?.gstin || 'GSTIN Not Available',
+                  companyPhone: merchant?.phone || '',
+                  companyEmail: merchant?.email || '',
                   companyLogo: companyLogo,
+                  
+                  // License Information
+                  fertilizerLicense: (merchant as any)?.fertilizer_license || '',
+                  seedLicense: (merchant as any)?.seed_license || '',
+                  pesticideLicense: (merchant as any)?.pesticide_license || '',
+                  dealerRegistration: (merchant as any)?.dealer_registration_id || '',
+                  
+                  // Invoice Details
                   invoiceNumber: qrCodeData.number,
                   invoiceDate: new Date(qrCodeData.date).toLocaleDateString('en-IN'),
-                  customerName: customerData?.name || 'Walk-in Customer',
-                  customerAddress: customerData?.address || '',
-                  customerGSTIN: customerData?.gstin,
-                  items: cartItems.map((item, index) => ({
-                    sno: index + 1,
-                    description: item.product.name,
-                    hsn: item.product.hsn_code || '31054000',
-                    batch: item.product.batch_number || 'N/A',
-                    expiry: item.product.expiry_date || 'N/A',
-                    qty: item.quantity,
-                    unit: item.product.unit || 'Kg',
-                    rate: item.product.sale_price || 0,
-                    amount: (item.product.sale_price || 0) * item.quantity,
-                    taxable: (item.product.sale_price || 0) * item.quantity,
-                    cgst: ((item.product.sale_price || 0) * item.quantity * gstRate) / 200,
-                    sgst: ((item.product.sale_price || 0) * item.quantity * gstRate) / 200,
-                    igst: 0,
-                    total: ((item.product.sale_price || 0) * item.quantity) * (1 + gstRate / 100)
-                  })),
+                  invoiceTitle: invoiceDisplay.title,
+                  
+                  // Customer Information
+                  customerName: fullCustomerData?.name || customerData?.name || 'Walk-in Customer',
+                  customerAddress: fullCustomerData?.address || customerData?.address || '',
+                  customerPhone: fullCustomerData?.phone || '',
+                  customerGSTIN: fullCustomerData?.gstin || fullCustomerData?.gst_number || customerData?.gstin || '',
+                  customerVillage: fullCustomerData?.village || '',
+                  customerDistrict: fullCustomerData?.district || '',
+                  customerState: fullCustomerData?.state || '',
+                  customerPincode: fullCustomerData?.pincode || '',
+                  customerType: fullCustomerData?.customer_type || customerData?.customer_type || 'Farmer',
+                  items: cartItems.map((item: any, index: number) => {
+                    const itemAmount = (item.product.sale_price || 0) * item.quantity;
+                    const itemGstBreakdown = calculateGSTBreakdown(
+                      (itemAmount * gstRate) / 100,
+                      merchant?.state || 'Maharashtra',
+                      fullCustomerData?.state || merchant?.state || 'Maharashtra'
+                    );
+                    
+                    return {
+                      sno: index + 1,
+                      description: item.product.name,
+                      hsn: item.product.hsn_code || '31054000',
+                      batch: item.product.batch_number || 'N/A',
+                      expiry: item.product.expiry_date || 'N/A',
+                      qty: item.quantity,
+                      unit: item.product.unit || 'Kg',
+                      rate: item.product.sale_price || 0,
+                      amount: itemAmount,
+                      taxable: itemAmount,
+                      cgst: itemGstBreakdown.cgstAmount,
+                      sgst: itemGstBreakdown.sgstAmount,
+                      igst: itemGstBreakdown.igstAmount,
+                      total: itemAmount + itemGstBreakdown.totalGstAmount
+                    };
+                  }),
                   totalAmount: totals.total,
                   amountInWords: convertToWords(totals.total),
                   paymentMethod: salePaymentMethod,

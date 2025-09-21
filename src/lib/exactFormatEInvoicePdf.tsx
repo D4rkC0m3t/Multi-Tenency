@@ -42,6 +42,7 @@ export type ExactEInvoiceData = {
   // Company Details
   companyName: string;
   companyAddress: string[];
+  companyLogo?: string;
   gstin: string;
   stateName: string;
   stateCode: string;
@@ -138,6 +139,16 @@ const styles = StyleSheet.create({
     borderRightColor: '#000'
   },
   
+  taxInvoiceTitleSection: {
+    flex: 1,
+    padding: 3,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRightWidth: 1,
+    borderStyle: 'solid',
+    borderRightColor: '#000'
+  },
+  
   originalSection: {
     width: 120,
     padding: 3,
@@ -165,11 +176,12 @@ const styles = StyleSheet.create({
   
   // Company Section
   companySection: {
-    padding: 8,
+    padding: 12,
     borderWidth: 1,
     borderStyle: 'solid',
     borderColor: '#000',
-    marginBottom: 2
+    marginBottom: 2,
+    minHeight: 120
   },
   
   companyLeft: {
@@ -178,17 +190,44 @@ const styles = StyleSheet.create({
   
   // Company Header
   companyHeader: {
-    alignItems: 'center',
-    padding: 5,
-    borderBottomWidth: 1,
-    borderStyle: 'solid',
-    borderBottomColor: '#000'
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    padding: 8,
+    justifyContent: 'space-between'
   },
   
   companyName: {
     fontSize: 12,
     fontWeight: 'bold',
     marginBottom: 2
+  },
+  
+  logoSection: {
+    width: 80,
+    height: 80,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  
+  companyDetails: {
+    flex: 1,
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 10
+  },
+  
+  taxInvoiceTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    textDecoration: 'underline'
+  },
+  
+  headerTaxInvoiceTitle: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    textDecoration: 'underline'
   },
   
   // Invoice Details Section
@@ -467,20 +506,29 @@ export function ExactEInvoiceContent({ data }: { data: ExactEInvoiceData }) {
       return result;
     };
     
-    if (num === 0) return 'Zero';
+    if (num === 0) return 'Zero Rupees Only';
+    
+    const integerPart = Math.floor(num);
+    const decimalPart = Math.round((num - integerPart) * 100);
     
     let result = '';
-    const crores = Math.floor(num / 10000000);
-    const lakhs = Math.floor((num % 10000000) / 100000);
-    const thousands = Math.floor((num % 100000) / 1000);
-    const hundreds = num % 1000;
+    const crores = Math.floor(integerPart / 10000000);
+    const lakhs = Math.floor((integerPart % 10000000) / 100000);
+    const thousands = Math.floor((integerPart % 100000) / 1000);
+    const hundreds = integerPart % 1000;
     
     if (crores > 0) result += convertHundreds(crores) + 'Crore ';
     if (lakhs > 0) result += convertHundreds(lakhs) + 'Lakh ';
     if (thousands > 0) result += convertHundreds(thousands) + 'Thousand ';
     if (hundreds > 0) result += convertHundreds(hundreds);
     
-    return result.trim() + ' Rupees Only';
+    result = result.trim() + ' Rupees';
+    
+    if (decimalPart > 0) {
+      result += ' and ' + convertHundreds(decimalPart).trim() + ' Paise';
+    }
+    
+    return result + ' Only';
   };
 
   const renderQRCode = () => {
@@ -519,6 +567,9 @@ export function ExactEInvoiceContent({ data }: { data: ExactEInvoiceData }) {
               <Text style={styles.bold}>Ack No.: {data.ackNo}</Text>
               <Text style={styles.bold}>Ack Date: {data.ackDate}</Text>
             </View>
+            <View style={styles.taxInvoiceTitleSection}>
+              <Text style={styles.headerTaxInvoiceTitle}>TAX INVOICE</Text>
+            </View>
             <View style={styles.originalSection}>
               <Text style={styles.bold}>(ORIGINAL FOR RECIPIENT)</Text>
             </View>
@@ -537,38 +588,57 @@ export function ExactEInvoiceContent({ data }: { data: ExactEInvoiceData }) {
 
         {/* Company Section */}
         <View style={styles.companySection}>
-          <View style={styles.companyLeft}>
-            <Text style={[styles.bold, styles.center, { fontSize: 14, marginBottom: 6 }]}>{data.companyName}</Text>
-            <Text style={[styles.center, { fontSize: 9, marginBottom: 6, fontWeight: 'bold' }]}>TAX INVOICE</Text>
-            {data.companyAddress && data.companyAddress.map((line, index) => (
-              <Text key={index} style={[styles.center, { fontSize: 7, marginBottom: 1 }]}>{line}</Text>
-            ))}
-            <Text style={[styles.center, { fontSize: 7, marginBottom: 1 }]}>
-              GSTIN/UIN: {data.gstin}, State Name: {data.stateName}, Code: {data.stateCode}
-            </Text>
-            <Text style={[styles.center, { fontSize: 7, marginBottom: 2 }]}>
-              Mobile Number: {data.mobile}, E-Mail: {data.email}
-            </Text>
-            {/* Fertilizer Licensing Information */}
-            {(data.fertilizerLicense || data.seedLicense || data.pesticideLicense) && (
-              <View style={{ marginTop: 2, padding: 1 }}>
-                {data.fertilizerLicense && (
-                  <Text style={[styles.center, { fontSize: 7 }]}>
-                    Fertilizer Sale License: {data.fertilizerLicense}
-                  </Text>
-                )}
-                {data.seedLicense && (
-                  <Text style={[styles.center, { fontSize: 7 }]}>
-                    Seed License: {data.seedLicense}
-                  </Text>
-                )}
-                {data.pesticideLicense && (
-                  <Text style={[styles.center, { fontSize: 7 }]}>
-                    Pesticide License: {data.pesticideLicense}
-                  </Text>
-                )}
-              </View>
-            )}
+          {/* Company Header with Logo and Details */}
+          <View style={styles.companyHeader}>
+            {/* Company Logo */}
+            <View style={styles.logoSection}>
+              {data.companyLogo ? (
+                <Image style={{ width: 70, height: 70 }} src={data.companyLogo} />
+              ) : (
+                <View style={{ width: 70, height: 70, borderWidth: 1, borderColor: '#ccc', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f9f9f9' }}>
+                  <Text style={{ fontSize: 6, textAlign: 'center', color: '#666' }}>[Company{"\n"}Logo]</Text>
+                </View>
+              )}
+            </View>
+            
+            {/* Company Details - Centered */}
+            <View style={styles.companyDetails}>
+              {/* Company Name with more spacing */}
+              <Text style={[styles.bold, styles.center, { fontSize: 16, marginBottom: 8, fontWeight: 'bold' }]}>
+                {data.companyName}
+              </Text>
+              
+              {/* Address with spacing */}
+              {data.companyAddress && data.companyAddress.map((line, index) => (
+                <Text key={index} style={[styles.center, { fontSize: 8, marginBottom: 2, lineHeight: 1.2 }]}>
+                  {line}
+                </Text>
+              ))}
+              
+              {/* GSTIN and State with spacing */}
+              <Text style={[styles.center, { fontSize: 8, marginBottom: 2, marginTop: 3 }]}>
+                GSTIN/UIN: {data.gstin}, State Name: {data.stateName}, Code: {data.stateCode}
+              </Text>
+              
+              {/* Contact details with spacing */}
+              <Text style={[styles.center, { fontSize: 8, marginBottom: 4 }]}>
+                Mobile Number: {data.mobile}, E-Mail: {data.email}
+              </Text>
+              
+              {/* Fertilizer Licensing Information with better spacing */}
+              {(data.fertilizerLicense || data.seedLicense || data.pesticideLicense) && (
+                <Text style={[styles.center, { fontSize: 7, marginTop: 4, backgroundColor: '#f8f9fa', padding: 2, borderRadius: 2 }]}>
+                  {[
+                    data.fertilizerLicense && `Fertilizer License: ${data.fertilizerLicense}`,
+                    data.seedLicense && `Seed License: ${data.seedLicense}`,
+                    data.pesticideLicense && `Pesticide License: ${data.pesticideLicense}`
+                  ].filter(Boolean).join(' | ')}
+                </Text>
+              )}
+            </View>
+            
+            {/* Empty space for balance (same width as logo) */}
+            <View style={{ width: 80 }} />
           </View>
         </View>
 

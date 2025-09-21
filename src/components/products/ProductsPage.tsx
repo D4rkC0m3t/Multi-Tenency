@@ -1,5 +1,15 @@
 import { useEffect, useState } from 'react';
-import { Add as AddIcon, Search as SearchIcon, Inventory as InventoryIcon, Edit as EditIcon, Delete as DeleteIcon, SelectAll as SelectAllIcon, DeleteSweep as BulkDeleteIcon } from '@mui/icons-material';
+import { 
+  Add as AddIcon, 
+  Search as SearchIcon, 
+  Inventory as InventoryIcon, 
+  Edit as EditIcon, 
+  Delete as DeleteIcon, 
+  DeleteSweep as BulkDeleteIcon,
+  FilterList as FilterIcon,
+  Clear as ClearIcon,
+  Image as ImageIcon
+} from '@mui/icons-material';
 import { supabase, Product, Category } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { ProductForm } from './ProductForm';
@@ -31,6 +41,11 @@ import {
   FormControl,
   InputLabel,
   Toolbar,
+  Collapse,
+  Grid,
+  Slider,
+  Avatar,
+  Card,
 } from '@mui/material';
 
 export function ProductsPage() {
@@ -47,6 +62,26 @@ export function ProductsPage() {
   const [importing, setImporting] = useState(false);
   const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
   const [bulkOperating, setBulkOperating] = useState(false);
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [stockFilter, setStockFilter] = useState('all');
+  const [priceRange, setPriceRange] = useState<number[]>([0, 10000]);
+  const [expiryFilter, setExpiryFilter] = useState('all');
+  const [brandFilter, setBrandFilter] = useState('all');
+  const [brands, setBrands] = useState<string[]>([]);
+  const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([null, null]);
+
+  const getExpiryStatus = (expiryDate: string | null) => {
+    if (!expiryDate) return null;
+    
+    const today = new Date();
+    const expiry = new Date(expiryDate);
+    const daysUntilExpiry = Math.ceil((expiry.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+    
+    if (daysUntilExpiry < 0) return { status: 'expired' };
+    if (daysUntilExpiry <= 30) return { status: 'expiring-soon' };
+    return { status: 'valid' };
+  };
 
   useEffect(() => {
     if (merchant) {
@@ -56,6 +91,40 @@ export function ProductsPage() {
       setLoading(false);
     }
   }, [merchant]);
+
+  useEffect(() => {
+    // Extract unique brands from products
+    const uniqueBrands = [...new Set(products.map(p => p.brand).filter((brand): brand is string => Boolean(brand)))];
+    setBrands(uniqueBrands);
+
+    // Set initial price range based on products
+    if (products.length > 0) {
+      const prices = products.map(p => p.sale_price || 0).filter(p => p > 0);
+      if (prices.length > 0) {
+        const minPrice = Math.min(...prices);
+        const maxPrice = Math.max(...prices);
+        setPriceRange([Math.floor(minPrice), Math.ceil(maxPrice)]);
+      }
+    }
+  }, [products]);
+
+  const clearAllFilters = () => {
+    setSearchTerm('');
+    setSelectedCategory('all');
+    setStatusFilter('all');
+    setStockFilter('all');
+    setBrandFilter('all');
+    setExpiryFilter('all');
+    setDateRange([null, null]);
+    if (products.length > 0) {
+      const prices = products.map(p => p.sale_price || 0).filter(p => p > 0);
+      if (prices.length > 0) {
+        const minPrice = Math.min(...prices);
+        const maxPrice = Math.max(...prices);
+        setPriceRange([Math.floor(minPrice), Math.ceil(maxPrice)]);
+      }
+    }
+  };
 
   const fetchProducts = async () => {
     if (!merchant) return;
@@ -192,25 +261,76 @@ export function ProductsPage() {
     
     const matchesCategory = selectedCategory === 'all' || product.category_id === selectedCategory;
     
-    return matchesSearch && matchesCategory;
+    const matchesStatus = statusFilter === 'all' || product.status === statusFilter;
+    
+    const matchesStock = (() => {
+      if (stockFilter === 'all') return true;
+      if (stockFilter === 'in-stock') return product.current_stock > (product.minimum_stock || 0);
+      if (stockFilter === 'low-stock') return product.current_stock <= (product.minimum_stock || 0) && product.current_stock > 0;
+      if (stockFilter === 'out-of-stock') return product.current_stock <= 0;
+      return true;
+    })();
+    
+    const matchesPrice = (product.sale_price || 0) >= priceRange[0] && (product.sale_price || 0) <= priceRange[1];
+    
+    const matchesBrand = brandFilter === 'all' || product.brand === brandFilter;
+    
+    const matchesExpiry = (() => {
+      if (expiryFilter === 'all') return true;
+      if (!product.expiry_date) return expiryFilter === 'no-expiry';
+      
+      const today = new Date();
+      const expiry = new Date(product.expiry_date);
+      const daysUntilExpiry = Math.ceil((expiry.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+      
+      if (expiryFilter === 'expired') return daysUntilExpiry < 0;
+      if (expiryFilter === 'expiring-soon') return daysUntilExpiry >= 0 && daysUntilExpiry <= 30;
+      if (expiryFilter === 'valid') return daysUntilExpiry > 30;
+      if (expiryFilter === 'no-expiry') return false;
+      return true;
+    })();
+    
+    const matchesDate = (() => {
+      if (!dateRange[0] && !dateRange[1]) return true;
+      const productDate = new Date(product.created_at);
+      if (dateRange[0] && productDate < dateRange[0]) return false;
+      if (dateRange[1] && productDate > dateRange[1]) return false;
+      return true;
+    })();
+
+    return matchesSearch && matchesCategory && matchesStatus && matchesStock && matchesPrice && matchesBrand && matchesExpiry && matchesDate;
   });
+
+  const getProductImageUrl = (product: Product) => {
+    if (!product.image_path) return null;
+    
+    // If it's already a full URL, return as is
+    if (product.image_path.startsWith('http')) {
+      return product.image_path;
+    }
+    
+    // If it's a Supabase storage path
+    if (product.image_path.includes('/storage/v1/object/')) {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      return `${supabaseUrl}/storage/v1/object/public/${product.image_path}`;
+    }
+    
+    // If it's just a filename, assume it's in the product-images bucket
+    return `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/product-images/${product.image_path}`;
+  };
 
   const getStockStatus = (product: Product) => {
     if (product.current_stock <= 0) return { status: 'out-of-stock', color: 'text-red-600', bg: 'bg-red-100' };
-    if (product.current_stock <= product.minimum_stock) return { status: 'low-stock', color: 'text-yellow-600', bg: 'bg-yellow-100' };
+    if (product.current_stock <= (product.minimum_stock || 0)) return { status: 'low-stock', color: 'text-yellow-600', bg: 'bg-yellow-100' };
     return { status: 'in-stock', color: 'text-green-600', bg: 'bg-green-100' };
   };
 
-  const getExpiryStatus = (expiryDate?: string) => {
-    if (!expiryDate) return null;
-    
-    const today = new Date();
-    const expiry = new Date(expiryDate);
-    const daysUntilExpiry = Math.ceil((expiry.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-    
-    if (daysUntilExpiry < 0) return { status: 'expired', color: 'text-red-600', bg: 'bg-red-100' };
-    if (daysUntilExpiry <= 30) return { status: 'expiring-soon', color: 'text-orange-600', bg: 'bg-orange-100' };
-    return null;
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-IN', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    });
   };
 
   if (loading) {
@@ -260,30 +380,161 @@ export function ProductsPage() {
         </Stack>
       </Stack>
 
+      {/* Enhanced Filters */}
       <Paper sx={{ p: 2, mb: 2 }}>
-        <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
-          <TextField
-            fullWidth
-            label="Search"
-            placeholder="Search products..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            InputProps={{ startAdornment: (<InputAdornment position="start"><SearchIcon /></InputAdornment>) }}
-          />
-          <Select
-            fullWidth
-            value={selectedCategory}
-            onChange={(e) => setSelectedCategory(e.target.value as string)}
-            displayEmpty
-          >
-            <MenuItem value="all">All Categories</MenuItem>
-            {categories.map(category => (
-              <MenuItem key={category.id} value={category.id}>{category.name}</MenuItem>
-            ))}
-          </Select>
-          <Box sx={{ minWidth: 200, display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
-            <Typography variant="caption" color="text.secondary">Showing {filteredProducts.length} of {products.length} products</Typography>
-          </Box>
+        <Stack spacing={2}>
+          {/* Basic Filters Row */}
+          <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
+            <TextField
+              fullWidth
+              label="Search"
+              placeholder="Search products..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              InputProps={{ startAdornment: (<InputAdornment position="start"><SearchIcon /></InputAdornment>) }}
+            />
+            <FormControl fullWidth>
+              <InputLabel>Category</InputLabel>
+              <Select
+                value={selectedCategory}
+                onChange={(e) => setSelectedCategory(e.target.value as string)}
+                label="Category"
+              >
+                <MenuItem value="all">All Categories</MenuItem>
+                {categories.map(category => (
+                  <MenuItem key={category.id} value={category.id}>{category.name}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <Stack direction="row" spacing={1} alignItems="center">
+              <Button
+                variant={showAdvancedFilters ? "contained" : "outlined"}
+                startIcon={<FilterIcon />}
+                onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+                size="large"
+              >
+                Filters
+              </Button>
+              <Button
+                variant="outlined"
+                startIcon={<ClearIcon />}
+                onClick={clearAllFilters}
+                size="large"
+              >
+                Clear
+              </Button>
+            </Stack>
+          </Stack>
+
+          {/* Advanced Filters */}
+          <Collapse in={showAdvancedFilters}>
+            <Card variant="outlined" sx={{ p: 2, bgcolor: 'grey.50' }}>
+              <Typography variant="subtitle2" gutterBottom>Advanced Filters</Typography>
+              <Grid container spacing={3}>
+                <Grid item xs={12} sm={6} md={3}>
+                  <FormControl fullWidth size="small">
+                    <InputLabel>Status</InputLabel>
+                    <Select
+                      value={statusFilter}
+                      onChange={(e) => setStatusFilter(e.target.value)}
+                      label="Status"
+                    >
+                      <MenuItem value="all">All Status</MenuItem>
+                      <MenuItem value="active">Active</MenuItem>
+                      <MenuItem value="discontinued">Discontinued</MenuItem>
+                      <MenuItem value="out_of_stock">Out of Stock</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Grid>
+                <Grid item xs={12} sm={6} md={3}>
+                  <FormControl fullWidth size="small">
+                    <InputLabel>Stock Level</InputLabel>
+                    <Select
+                      value={stockFilter}
+                      onChange={(e) => setStockFilter(e.target.value)}
+                      label="Stock Level"
+                    >
+                      <MenuItem value="all">All Stock Levels</MenuItem>
+                      <MenuItem value="in-stock">In Stock</MenuItem>
+                      <MenuItem value="low-stock">Low Stock</MenuItem>
+                      <MenuItem value="out-of-stock">Out of Stock</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Grid>
+                <Grid item xs={12} sm={6} md={3}>
+                  <FormControl fullWidth size="small">
+                    <InputLabel>Brand</InputLabel>
+                    <Select
+                      value={brandFilter}
+                      onChange={(e) => setBrandFilter(e.target.value)}
+                      label="Brand"
+                    >
+                      <MenuItem value="all">All Brands</MenuItem>
+                      {brands.map((brand: string) => (
+                        <MenuItem key={brand} value={brand}>{brand}</MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Grid>
+                <Grid item xs={12} sm={6} md={3}>
+                  <FormControl fullWidth size="small">
+                    <InputLabel>Expiry Status</InputLabel>
+                    <Select
+                      value={expiryFilter}
+                      onChange={(e) => setExpiryFilter(e.target.value)}
+                      label="Expiry Status"
+                    >
+                      <MenuItem value="all">All Products</MenuItem>
+                      <MenuItem value="valid">Valid</MenuItem>
+                      <MenuItem value="expiring-soon">Expiring Soon</MenuItem>
+                      <MenuItem value="expired">Expired</MenuItem>
+                      <MenuItem value="no-expiry">No Expiry Date</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Grid>
+                <Grid item xs={12} sm={6} md={3}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="Date From"
+                    type="date"
+                    value={dateRange[0] ? dateRange[0].toISOString().split('T')[0] : ''}
+                    onChange={(e) => {
+                      const date = e.target.value ? new Date(e.target.value) : null;
+                      setDateRange([date, dateRange[1]]);
+                    }}
+                    InputLabelProps={{ shrink: true }}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6} md={3}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="Date To"
+                    type="date"
+                    value={dateRange[1] ? dateRange[1].toISOString().split('T')[0] : ''}
+                    onChange={(e) => {
+                      const date = e.target.value ? new Date(e.target.value) : null;
+                      setDateRange([dateRange[0], date]);
+                    }}
+                    InputLabelProps={{ shrink: true }}
+                  />
+                </Grid>
+              </Grid>
+              <Box sx={{ mt: 2 }}>
+                <Typography variant="body2" gutterBottom>Price Range: ₹{priceRange[0]} - ₹{priceRange[1]}</Typography>
+                <Slider
+                  value={priceRange}
+                  onChange={(_, newValue) => setPriceRange(newValue as number[])}
+                  valueLabelDisplay="auto"
+                  min={0}
+                  max={10000}
+                  step={50}
+                  sx={{ maxWidth: 300 }}
+                />
+              </Box>
+            </Card>
+          </Collapse>
         </Stack>
       </Paper>
 
@@ -338,11 +589,13 @@ export function ProductsPage() {
                   inputProps={{ 'aria-label': 'select all products' }}
                 />
               </TableCell>
+              <TableCell>Image</TableCell>
               <TableCell>Product</TableCell>
               <TableCell>SKU</TableCell>
               <TableCell>Category</TableCell>
               <TableCell>Stock</TableCell>
               <TableCell>Price</TableCell>
+              <TableCell>Date Added</TableCell>
               <TableCell>Status</TableCell>
               <TableCell align="right">Actions</TableCell>
             </TableRow>
@@ -351,6 +604,7 @@ export function ProductsPage() {
             {filteredProducts.map((product) => {
               const stockStatus = getStockStatus(product);
               const expiryStatus = getExpiryStatus(product.expiry_date);
+              const imageUrl = getProductImageUrl(product);
               return (
                 <TableRow key={product.id} hover>
                   <TableCell padding="checkbox">
@@ -359,6 +613,15 @@ export function ProductsPage() {
                       onChange={() => handleSelectProduct(product.id)}
                       inputProps={{ 'aria-labelledby': `product-${product.id}` }}
                     />
+                  </TableCell>
+                  <TableCell>
+                    <Avatar
+                      variant="rounded"
+                      src={imageUrl || undefined}
+                      sx={{ width: 40, height: 40 }}
+                    >
+                      {imageUrl ? null : <ImageIcon />}
+                    </Avatar>
                   </TableCell>
                   <TableCell>
                     <Stack spacing={0.3}>
@@ -381,7 +644,13 @@ export function ProductsPage() {
                   </TableCell>
                   <TableCell>
                     <Typography variant="body2">₹{product.sale_price}</Typography>
-                    <Typography variant="caption" color="text.secondary">Cost: ₹{product.cost_price}</Typography>
+                    <Typography variant="caption" color="text.secondary">Cost: ₹{(product as any).cost_price || 0}</Typography>
+                  </TableCell>
+                  <TableCell>
+                    <Typography variant="body2">{formatDate(product.created_at)}</Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {new Date(product.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                    </Typography>
                   </TableCell>
                   <TableCell>
                     <Chip size="small" label={product.status} color={product.status === 'active' ? 'success' : product.status === 'discontinued' ? 'error' : 'default'} variant={product.status === 'active' ? 'filled' : 'outlined'} />

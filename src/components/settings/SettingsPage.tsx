@@ -20,7 +20,13 @@ import {
   ListItemText,
   ListItemSecondaryAction,
   IconButton,
-  Chip
+  Chip,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Checkbox,
+  FormControlLabel
 } from '@mui/material';
 import {
   Person as PersonIcon,
@@ -34,8 +40,20 @@ import {
 } from '@mui/icons-material';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
+
+// Helper function to get display name for GST registration type
+const getGSTRegistrationTypeDisplayName = (type: string): string => {
+  switch (type) {
+    case 'regular': return 'Regular GST';
+    case 'composition': return 'Composition Scheme';
+    case 'exempt': return 'Exempt Supplies';
+    case 'unregistered': return 'Unregistered';
+    default: return 'Regular GST';
+  }
+};
 import { useForm, Controller } from 'react-hook-form';
 import toast from 'react-hot-toast';
+import { getAllIndianStates } from '../../utils/gstCalculations';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -82,6 +100,10 @@ export function SettingsPage() {
     pesticide_license: merchant?.pesticide_license || '',
     dealer_registration_id: merchant?.dealer_registration_id || '',
     address: merchant?.address || '',
+    state: merchant?.state || '',
+    gst_registration_type: (merchant as any)?.gst_registration_type || 'regular',
+    composition_dealer: (merchant as any)?.composition_dealer || false,
+    exempt_supplies: (merchant as any)?.exempt_supplies || false,
     phone: merchant?.phone || '',
     email: merchant?.email || '',
     website: merchant?.website || '',
@@ -103,6 +125,10 @@ export function SettingsPage() {
     pesticide_license: '',
     dealer_registration_id: '',
     address: '',
+    state: '',
+    gst_registration_type: 'regular',
+    composition_dealer: false,
+    exempt_supplies: false,
     phone: '',
     email: '',
     website: '',
@@ -148,6 +174,10 @@ export function SettingsPage() {
         pesticide_license: newBiz.pesticide_license.trim() || null,
         dealer_registration_id: newBiz.dealer_registration_id.trim() || null,
         address: newBiz.address.trim() || null,
+        state: newBiz.state.trim() || null,
+        gst_registration_type: newBiz.gst_registration_type,
+        composition_dealer: newBiz.composition_dealer,
+        exempt_supplies: newBiz.exempt_supplies,
         phone: newBiz.phone.trim() || null,
         email: newBiz.email.trim() || null,
         website: newBiz.website.trim() || null,
@@ -223,6 +253,10 @@ export function SettingsPage() {
         pesticide_license: bizForm.pesticide_license.trim() || null,
         dealer_registration_id: bizForm.dealer_registration_id.trim() || null,
         address: bizForm.address.trim() || null,
+        state: bizForm.state.trim() || null,
+        gst_registration_type: bizForm.gst_registration_type,
+        composition_dealer: bizForm.composition_dealer,
+        exempt_supplies: bizForm.exempt_supplies,
         phone: bizForm.phone.trim() || null,
         email: bizForm.email.trim() || null,
         website: bizForm.website.trim() || null,
@@ -636,6 +670,14 @@ export function SettingsPage() {
                       <Typography variant="body1">{merchant.gst_number || 'Not set'}</Typography>
                     </Grid>
                     <Grid item xs={12} sm={6}>
+                      <Typography variant="body2" color="text.secondary">GST Registration Type</Typography>
+                      <Typography variant="body1">
+                        {getGSTRegistrationTypeDisplayName((merchant as any)?.gst_registration_type || 'regular')}
+                        {(merchant as any)?.composition_dealer && ' (Composition)'}
+                        {(merchant as any)?.exempt_supplies && ' (Exempt)'}
+                      </Typography>
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
                       <Typography variant="body2" color="text.secondary">PAN Number</Typography>
                       <Typography variant="body1">{(merchant as any).pan_number || 'Not set'}</Typography>
                     </Grid>
@@ -674,6 +716,10 @@ export function SettingsPage() {
                     <Grid item xs={12}>
                       <Typography variant="body2" color="text.secondary">Registered Office Address</Typography>
                       <Typography variant="body1">{merchant.address || 'Not set'}</Typography>
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                      <Typography variant="body2" color="text.secondary">State</Typography>
+                      <Typography variant="body1">{merchant.state || 'Not set'}</Typography>
                     </Grid>
                     <Grid item xs={12} sm={6}>
                       <Typography variant="body2" color="text.secondary">Phone Number</Typography>
@@ -761,6 +807,43 @@ export function SettingsPage() {
                       />
                     </Grid>
                     <Grid item xs={12} sm={6}>
+                      <FormControl fullWidth>
+                        <InputLabel>GST Registration Type</InputLabel>
+                        <Select
+                          value={bizForm.gst_registration_type}
+                          onChange={(e)=>handleBizChange('gst_registration_type', e.target.value)}
+                          label="GST Registration Type"
+                        >
+                          <MenuItem value="regular">Regular GST</MenuItem>
+                          <MenuItem value="composition">Composition Scheme</MenuItem>
+                          <MenuItem value="exempt">Exempt Supplies</MenuItem>
+                          <MenuItem value="unregistered">Unregistered</MenuItem>
+                        </Select>
+                      </FormControl>
+                    </Grid>
+                    <Grid item xs={12}>
+                      <Box display="flex" gap={2}>
+                        <FormControlLabel
+                          control={
+                            <Checkbox
+                              checked={bizForm.composition_dealer}
+                              onChange={(e) => handleBizChange('composition_dealer', e.target.checked)}
+                            />
+                          }
+                          label="Composition Dealer"
+                        />
+                        <FormControlLabel
+                          control={
+                            <Checkbox
+                              checked={bizForm.exempt_supplies}
+                              onChange={(e) => handleBizChange('exempt_supplies', e.target.checked)}
+                            />
+                          }
+                          label="Exempt Supplies"
+                        />
+                      </Box>
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
                       <TextField 
                         label="PAN Number" 
                         fullWidth 
@@ -836,8 +919,26 @@ export function SettingsPage() {
                         minRows={2} 
                         value={bizForm.address} 
                         onChange={(e)=>handleBizChange('address', e.target.value)}
-                        placeholder="Street, City, District, State, Pin Code"
+                        placeholder="Street, City, District, Pin Code"
+                        helperText="Complete business address (exclude state - select below)"
                       />
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                      <FormControl fullWidth>
+                        <InputLabel>State</InputLabel>
+                        <Select
+                          value={bizForm.state}
+                          onChange={(e)=>handleBizChange('state', e.target.value)}
+                          label="State"
+                        >
+                          <MenuItem value="">Select State</MenuItem>
+                          {getAllIndianStates().map(state => (
+                            <MenuItem key={state.stateCode} value={state.stateName}>
+                              {state.stateName}
+                            </MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
                     </Grid>
                     <Grid item xs={12} sm={6}>
                       <TextField 

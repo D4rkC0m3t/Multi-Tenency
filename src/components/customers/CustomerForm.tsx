@@ -4,6 +4,7 @@ import { Close as CloseIcon } from '@mui/icons-material';
 import { supabase, Customer } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import toast from 'react-hot-toast';
+import { getAllIndianStates } from '../../utils/gstCalculations';
 
 interface CustomerFormProps {
   customer?: Customer | null;
@@ -218,12 +219,17 @@ export function CustomerForm({ customer, onClose, onSave }: CustomerFormProps) {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-semibold text-gray-800 mb-2">State</label>
-                  <input
+                  <select
                     {...register('state')}
-                    type="text"
                     className="w-full px-3 py-2 border-2 border-gray-600 bg-gray-50 rounded-md focus:outline-none focus:ring-2 focus:ring-green-600 focus:border-green-600 text-gray-900"
-                    placeholder="State"
-                  />
+                  >
+                    <option value="">Select State</option>
+                    {getAllIndianStates().map(state => (
+                      <option key={state.stateCode} value={state.stateName}>
+                        {state.stateName}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-gray-800 mb-2">Pincode</label>
