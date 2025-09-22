@@ -56,6 +56,7 @@ export function ProductsPage() {
   const [showForm, setShowForm] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([null, null]);
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [importOpen, setImportOpen] = useState(false);
   const [importPreview, setImportPreview] = useState<any[]>([]);
@@ -245,28 +246,6 @@ export function ProductsPage() {
       setProducts(products.map(p => 
         selectedProducts.includes(p.id) ? { ...p, status } : p
       ));
-      setSelectedProducts([]);
-      toast.success(`${selectedProducts.length} products updated to ${status}`);
-    } catch (error) {
-      toast.error('Failed to update products');
-    } finally {
-      setBulkOperating(false);
-    }
-  };
-
-  const filteredProducts = products.filter(product => {
-    const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      product.sku?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      product.brand?.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesCategory = selectedCategory === 'all' || product.category_id === selectedCategory;
-    
-    const matchesStatus = statusFilter === 'all' || product.status === statusFilter;
-    
-    const matchesStock = (() => {
-      if (stockFilter === 'all') return true;
-      if (stockFilter === 'in-stock') return product.current_stock > (product.minimum_stock || 0);
-      if (stockFilter === 'low-stock') return product.current_stock <= (product.minimum_stock || 0) && product.current_stock > 0;
       if (stockFilter === 'out-of-stock') return product.current_stock <= 0;
       return true;
     })();
