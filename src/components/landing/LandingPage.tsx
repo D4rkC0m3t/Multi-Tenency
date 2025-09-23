@@ -1,221 +1,26 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronDown, BarChart3, Shield, Users, ArrowRight, Star, Menu, X, Zap, TrendingUp, Award } from 'lucide-react';
+import { 
+  BarChart3, Users, ArrowRight, Star, Menu, X, 
+  Package, AlertTriangle, CheckCircle, Warehouse, PieChart, 
+  TrendingUp, Globe, Phone, Mail
+} from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import Tilt from 'react-parallax-tilt';
-import { InventoryWarehouseLottie, FertilizerSpreadingLottie, AnalyticsChartLottie } from './LottieAnimations';
 import './LandingPage.css';
 
 const LandingPage: React.FC = () => {
   const navigate = useNavigate();
-  const [isVisible, setIsVisible] = useState<Record<string, boolean>>({});
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [scrollY, setScrollY] = useState(0);
-  const [currentBgIndex, setCurrentBgIndex] = useState(0);
-  
 
   useEffect(() => {
-    // Set body styles to match original
+    // Clean body styles for modern design
     document.body.style.margin = '0';
-    document.body.style.fontFamily = '"Montserrat", sans-serif';
-    document.body.style.backgroundColor = '#1b1b1b';
-    document.body.style.color = '#eef8ce';
-    document.body.style.fontSize = '14px';
-    document.body.style.backgroundImage = 'url(https://assets.codepen.io/453571/bg.avif), repeating-linear-gradient(to right, transparent 0 500px, #73814b33 500px 501px)';
-    document.body.style.backgroundSize = '100%';
-
-    // Load Three.js and initialize 3D scene
-    const loadThreeJS = async () => {
-      try {
-        // Load Three.js modules
-        const THREE = await import('three');
-        const { GLTFLoader } = await import('three/examples/jsm/loaders/GLTFLoader.js');
-        const { gsap } = await import('gsap');
-
-        // Initialize 3D scene
-        const camera = new THREE.PerspectiveCamera(
-          10,
-          window.innerWidth / window.innerHeight,
-          0.1,
-          1000
-        );
-        camera.position.z = 13;
-
-        const scene = new THREE.Scene();
-        let bee: any;
-
-        // Load the realistic bee model
-        let mixer: any;
-        const loader = new GLTFLoader();
-
-        // Load the bee GLB model
-        loader.load(
-          "https://raw.githubusercontent.com/DennysDionigi/bee-glb/94253437c023643dd868592e11a0fd2c228cfe07/demon_bee_full_texture.glb",
-          function (gltf: any) {
-            bee = gltf.scene;
-            bee.scale.set(0.5, 0.5, 0.5);
-            bee.position.set(0, -1, 0);
-            bee.rotation.set(0, 1.5, 0);
-
-            // Setup animations if available
-            if (gltf.animations && gltf.animations.length > 0) {
-              mixer = new THREE.AnimationMixer(bee);
-              gltf.animations.forEach((clip: any) => {
-                const action = mixer.clipAction(clip);
-                action.play();
-              });
-            }
-
-            // Create wing animations manually if not in model
-            const leftWing = bee.getObjectByName('LeftWing') || bee.children[0];
-            const rightWing = bee.getObjectByName('RightWing') || bee.children[1];
-
-            if (leftWing && rightWing) {
-              // Wing flapping animation
-              const wingAnimation = () => {
-                const time = Date.now() * 0.01;
-                leftWing.rotation.z = Math.sin(time) * 0.5;
-                rightWing.rotation.z = -Math.sin(time) * 0.5;
-                requestAnimationFrame(wingAnimation);
-              };
-              wingAnimation();
-            }
-
-            // Group wings with body for better control
-            const group = new THREE.Group();
-            group.add(bee);
-            
-            // Add individual wing objects if they exist
-            if (leftWing) group.add(leftWing);
-            if (rightWing) group.add(rightWing);
-
-            bee = group;
-            scene.add(bee);
-            modelMove();
-          }
-        );
-
-        const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.shadowMap.enabled = true;
-        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-        const container = document.getElementById('container3D');
-        if (container) {
-          container.appendChild(renderer.domElement);
-        }
-
-        // Lighting setup matching the original bee demo
-        const ambientLight = new THREE.AmbientLight(0xffffff, 1.3);
-        scene.add(ambientLight);
-
-        const topLight = new THREE.DirectionalLight(0xffffff, 1);
-        topLight.position.set(500, 500, 500);
-        scene.add(topLight);
-
-        // Animation loop with bee wing animations
-        const reRender3D = () => {
-          requestAnimationFrame(reRender3D);
-
-          // Update bee wing animations
-          if (mixer) {
-            mixer.update(0.02);
-          }
-
-          renderer.render(scene, camera);
-        };
-        reRender3D();
-
-        // Position configurations for different sections
-        const arrPositionModel = [
-          {
-            id: "banner",
-            position: { x: 0, y: -1, z: 0 },
-            rotation: { x: 0, y: 1.5, z: 0 }
-          },
-          {
-            id: "intro",
-            position: { x: 1, y: -1, z: -5 },
-            rotation: { x: 0.5, y: -0.5, z: 0.5 }
-          },
-          {
-            id: "description",
-            position: { x: -1, y: -1, z: -5 },
-            rotation: { x: 0, y: 0.5, z: 0.2 }
-          },
-          {
-            id: "contact",
-            position: { x: 0.45, y: -2, z: -10 },
-            rotation: { x: 0.2, y: -0.5, z: -0.2 }
-          }
-        ];
-
-        // Model movement based on scroll
-        const modelMove = () => {
-          const sections = document.querySelectorAll('.section');
-          let currentSection: string | undefined;
-          sections.forEach((section) => {
-            const rect = section.getBoundingClientRect();
-            if (rect.top <= window.innerHeight / 3) {
-              currentSection = section.id;
-            }
-          });
-
-          const position_active = arrPositionModel.findIndex(
-            (val) => val.id === currentSection
-          );
-
-          if (position_active >= 0 && bee) {
-            const new_coordinates = arrPositionModel[position_active];
-            gsap.to(bee.position, {
-              x: new_coordinates.position.x,
-              y: new_coordinates.position.y,
-              z: new_coordinates.position.z,
-              duration: 3,
-              ease: "power1.out"
-            });
-            gsap.to(bee.rotation, {
-              x: new_coordinates.rotation.x,
-              y: new_coordinates.rotation.y,
-              z: new_coordinates.rotation.z,
-              duration: 3,
-              ease: "power1.out"
-            });
-          }
-        };
-
-        // Scroll event listener
-        const handleScroll = () => {
-          if (bee) {
-            modelMove();
-          }
-        };
-
-        window.addEventListener('scroll', handleScroll);
-
-        // Resize handler
-        const handleResize = () => {
-          renderer.setSize(window.innerWidth, window.innerHeight);
-          camera.aspect = window.innerWidth / window.innerHeight;
-          camera.updateProjectionMatrix();
-        };
-
-        window.addEventListener('resize', handleResize);
-
-        // Cleanup function
-        return () => {
-          window.removeEventListener('scroll', handleScroll);
-          window.removeEventListener('resize', handleResize);
-          if (container && renderer.domElement) {
-            container.removeChild(renderer.domElement);
-          }
-        };
-
-      } catch (error) {
-        console.error('Error loading Three.js:', error);
-      }
-    };
-
-    loadThreeJS();
+    document.body.style.fontFamily = '"Inter", "Poppins", sans-serif';
+    document.body.style.backgroundColor = '#ffffff';
+    document.body.style.color = '#000000';
+    document.body.style.fontSize = '16px';
+    document.body.style.backgroundImage = '';
+    document.body.style.backgroundSize = '';
 
     return () => {
       // Reset body styles
@@ -229,153 +34,79 @@ const LandingPage: React.FC = () => {
     };
   }, []);
 
-  const heroBackgrounds = [
-    '/AdobeStock_215401104.jpeg',
-    '/AdobeStock_261294544.jpeg',
-    '/AdobeStock_331588650.jpeg',
-    '/2569.jpg',
-    '/composition-compost-made-rotten-food-2048x1429.jpeg',
-    '/top-view-veggies-with-salad-tool.jpg'
-  ];
-
-  useEffect(() => {
-    const handleScroll = () => setScrollY(window.scrollY);
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
-
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          setIsVisible(prev => ({
-            ...prev,
-            [entry.target.id]: entry.isIntersecting
-          }));
-        });
-      },
-      { threshold: 0.1 }
-    );
-
-    document.querySelectorAll('[id]').forEach((el) => {
-      observer.observe(el);
-    });
-
-    return () => observer.disconnect();
-  }, []);
-
-  // Cycle through hero backgrounds
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setCurrentBgIndex((prevIndex: number) =>
-        (prevIndex + 1) % heroBackgrounds.length
-      );
-    }, 5000); // Change background every 5 seconds
-
-    return () => clearInterval(interval);
-  }, [heroBackgrounds.length]);
-
   const scrollToSection = (sectionId: string) => {
     document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth' });
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-green-900 to-black overflow-x-hidden relative">
-      {/* Animated background particles */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        {[...Array(50)].map((_, i) => (
-          <motion.div
-            key={i}
-            className="absolute w-1 h-1 bg-green-400 rounded-full opacity-30"
-            style={{
-              left: `${Math.random() * 100}%`,
-              top: `${Math.random() * 100}%`,
-            }}
-            animate={{
-              y: [-20, -100],
-              opacity: [0, 1, 0],
-            }}
-            transition={{
-              duration: Math.random() * 3 + 2,
-              repeat: Infinity,
-              delay: Math.random() * 2,
-            }}
-          />
-        ))}
+    <div className="min-h-screen bg-white overflow-x-hidden">
+      {/* Subtle background pattern */}
+      <div className="fixed inset-0 opacity-[0.02] pointer-events-none">
+        <div className="absolute inset-0" style={{
+          backgroundImage: `radial-gradient(circle at 25% 25%, #3BA935 2px, transparent 2px),
+                           radial-gradient(circle at 75% 75%, #3BA935 2px, transparent 2px)`,
+          backgroundSize: '60px 60px'
+        }}></div>
       </div>
-      {/* 3D Container */}
-      <div id="container3D" className="fixed top-0 left-0 w-full h-full pointer-events-none" style={{ zIndex: 1 }}></div>
 
       {/* Navigation */}
       <motion.nav 
         initial={{ y: -100 }}
         animate={{ y: 0 }}
-        className="fixed top-0 w-full bg-black/20 backdrop-blur-xl border-b border-green-500/20 transition-all duration-300 shadow-2xl z-50"
+        className="fixed top-0 w-full bg-white/90 backdrop-blur-md border-b border-gray-100 z-50"
       >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-20">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-16">
+            {/* Logo */}
             <motion.div 
               className="flex items-center space-x-3"
-              whileHover={{ scale: 1.05 }}
+              whileHover={{ scale: 1.02 }}
             >
-              <div className="flex items-center space-x-3">
-                <div className="relative">
-                  <div className="absolute inset-0 bg-white/50 blur-2xl rounded-full transform scale-150"></div>
-                  <img 
-                    src="/image-removebg-preview.png" 
-                    alt="KrishiSethu Logo" 
-                    className="h-24 w-auto object-contain relative z-10"
-                    onError={(e) => {
-                      // Fallback to gradient icon if logo fails to load
-                      e.currentTarget.style.display = 'none';
-                      const nextElement = e.currentTarget.parentElement?.nextElementSibling as HTMLElement;
-                      if (nextElement) {
-                        nextElement.style.display = 'flex';
-                      }
-                    }}
-                  />
-                </div>
-                <div className="w-10 h-10 bg-gradient-to-br from-green-400 to-emerald-500 rounded-full items-center justify-center shadow-lg hidden">
-                  <span className="text-black font-bold text-lg">🌾</span>
-                </div>
+              <img 
+                src="/image-removebg-preview.png" 
+                alt="Logo" 
+                className="h-12 w-auto object-contain"
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none';
+                  const fallback = e.currentTarget.nextElementSibling as HTMLElement;
+                  if (fallback) fallback.style.display = 'flex';
+                }}
+              />
+              <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-emerald-600 rounded-lg items-center justify-center shadow-sm hidden">
+                <Package className="h-4 w-4 text-white" />
               </div>
             </motion.div>
+
+            {/* Desktop Navigation */}
             <div className="hidden md:flex items-center space-x-8">
-              {['features', 'benefits', 'gallery', 'testimonials'].map((section) => (
-                <motion.button
+              {['features', 'use-cases', 'pricing', 'testimonials'].map((section) => (
+                <button
                   key={section}
                   onClick={() => scrollToSection(section)}
-                  className="text-green-300 hover:text-green-100 transition-colors font-medium relative group"
-                  whileHover={{ scale: 1.1 }}
-                  whileTap={{ scale: 0.95 }}
+                  className="text-gray-600 hover:text-gray-900 font-medium transition-colors relative group"
                 >
-                  {section.charAt(0).toUpperCase() + section.slice(1)}
-                  <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-green-400 group-hover:w-full transition-all duration-300"></span>
-                </motion.button>
+                  {section === 'use-cases' ? 'Use Cases' : section.charAt(0).toUpperCase() + section.slice(1)}
+                  <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-green-500 group-hover:w-full transition-all duration-300"></span>
+                </button>
               ))}
               <motion.button
-                onClick={(e) => {
-                  e.preventDefault();
-                  navigate('/login');
-                }}
-                className="bg-gradient-to-r from-green-400 to-emerald-500 text-black px-6 py-2.5 rounded-full font-bold shadow-lg hover:shadow-green-400/50 transition-all duration-300 relative overflow-hidden group hover:from-green-300 hover:to-emerald-400 flex items-center space-x-2"
-                whileHover={{ scale: 1.05, boxShadow: '0 0 15px rgba(74, 222, 128, 0.5)' }}
-                whileTap={{ scale: 0.95 }}
+                onClick={() => navigate('/login')}
+                className="bg-green-500 hover:bg-green-600 text-white px-6 py-2 rounded-lg font-medium transition-colors"
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
               >
-                <span className="relative z-10">Login</span>
-                <div className="absolute inset-0 bg-gradient-to-r from-green-300 to-emerald-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                Get Started Free
               </motion.button>
             </div>
 
             {/* Mobile menu button */}
             <div className="md:hidden">
-              <motion.button
+              <button
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                className="text-green-300 hover:text-green-100 transition-colors"
-                whileTap={{ scale: 0.95 }}
+                className="text-gray-600 hover:text-gray-900"
               >
                 {isMobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-              </motion.button>
+              </button>
             </div>
           </div>
 
@@ -386,32 +117,30 @@ const LandingPage: React.FC = () => {
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: 'auto' }}
                 exit={{ opacity: 0, height: 0 }}
-                className="md:hidden bg-black/40 backdrop-blur-xl border-t border-green-500/20"
+                className="md:hidden border-t border-gray-100 bg-white"
               >
-                <div className="px-4 py-2 space-y-2">
-                  {['features', 'benefits', 'gallery', 'testimonials'].map((section) => (
-                    <motion.button
+                <div className="px-4 py-4 space-y-3">
+                  {['features', 'use-cases', 'pricing', 'testimonials'].map((section) => (
+                    <button
                       key={section}
                       onClick={() => {
                         scrollToSection(section);
                         setIsMobileMenuOpen(false);
                       }}
-                      className="block w-full text-left text-green-300 hover:text-green-100 py-2 transition-colors font-medium"
-                      whileHover={{ x: 10 }}
+                      className="block text-gray-600 hover:text-gray-900 font-medium"
                     >
-                      {section.charAt(0).toUpperCase() + section.slice(1)}
-                    </motion.button>
+                      {section === 'use-cases' ? 'Use Cases' : section.charAt(0).toUpperCase() + section.slice(1)}
+                    </button>
                   ))}
-                  <motion.button
+                  <button
                     onClick={() => {
                       navigate('/login');
                       setIsMobileMenuOpen(false);
                     }}
-                    className="block w-full text-left bg-gradient-to-r from-green-400 to-emerald-500 text-black px-4 py-2 rounded-full hover:shadow-green-400/50 transition-all duration-300 mt-2 font-bold"
-                    whileHover={{ scale: 1.02 }}
+                    className="block w-full text-left bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg font-medium transition-colors"
                   >
-                    Get Started
-                  </motion.button>
+                    Get Started Free
+                  </button>
                 </div>
               </motion.div>
             )}
@@ -420,233 +149,743 @@ const LandingPage: React.FC = () => {
       </motion.nav>
 
       {/* Hero Section */}
-      <section id="banner" className="section relative min-h-screen flex items-center justify-center overflow-hidden">
-        {/* Dark gradient background with parallax effect */}
-        <div className="absolute inset-0 z-0">
-          <div className="absolute inset-0 bg-gradient-to-br from-black via-green-900/50 to-black"></div>
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-green-900/20 via-transparent to-transparent"></div>
-        </div>
-
-        {/* Floating 3D elements */}
-        <div className="absolute inset-0 z-5">
-          {[...Array(6)].map((_, i) => (
+      <section className="pt-20 pb-16 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-6xl mx-auto">
+          <div className="grid lg:grid-cols-2 gap-12 items-center">
+            {/* Left Content */}
             <motion.div
-              key={i}
-              className="absolute"
-              style={{
-                left: `${20 + i * 15}%`,
-                top: `${30 + (i % 2) * 40}%`,
-              }}
-              animate={{
-                y: [-20, 20, -20],
-                rotate: [0, 360],
-                scale: [1, 1.1, 1],
-              }}
-              transition={{
-                duration: 4 + i,
-                repeat: Infinity,
-                delay: i * 0.5,
-              }}
+              initial={{ opacity: 0, x: -50 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.8 }}
             >
-              {i % 3 === 0 && <BarChart3 className="h-8 w-8 text-green-400/30" />}
-              {i % 3 === 1 && <Shield className="h-8 w-8 text-emerald-400/30" />}
-              {i % 3 === 2 && <Users className="h-8 w-8 text-green-300/30" />}
+              <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-gray-900 leading-tight mb-6">
+                Smart Fertilizer Inventory Management for{' '}
+                <span className="text-green-500">Modern Agriculture</span>
+              </h1>
+              <p className="text-xl text-gray-600 mb-8 leading-relaxed">
+                Track, manage, and optimize your fertilizer stock in real-time — reduce waste, boost profits, and simplify operations.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-4">
+                <motion.button
+                  onClick={() => navigate('/login')}
+                  className="bg-green-500 hover:bg-green-600 text-white px-8 py-4 rounded-lg text-lg font-semibold transition-colors inline-flex items-center justify-center"
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  Get Started Free
+                  <ArrowRight className="ml-2 h-5 w-5" />
+                </motion.button>
+                <button
+                  onClick={() => scrollToSection('features')}
+                  className="border border-gray-300 hover:border-gray-400 text-gray-700 px-8 py-4 rounded-lg text-lg font-semibold transition-colors"
+                >
+                  See Features
+                </button>
+              </div>
             </motion.div>
-          ))}
-        </div>
 
-        <motion.div 
-          initial={{ opacity: 0, y: 50 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 1 }}
-          className="relative z-10 text-center text-white px-4 max-w-5xl mx-auto"
-        >
-          <motion.h1 
-            className="text-6xl md:text-8xl font-bold mb-6 leading-tight"
-            initial={{ opacity: 0, y: 50 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 1, delay: 0.2 }}
-          >
-            <span className="bg-gradient-to-r from-green-400 via-emerald-400 to-green-300 bg-clip-text text-transparent">
-              Kri
-              <span className="bg-gradient-to-r from-yellow-400 via-orange-500 to-red-500 bg-clip-text text-transparent animate-pulse">
-                s
-              </span>
-              hi
-              <span className="bg-gradient-to-r from-blue-400 via-purple-500 to-pink-500 bg-clip-text text-transparent animate-pulse">
-                S
-              </span>
-              ethu
-            </span>
+            {/* Right Content - Dashboard Screenshot */}
             <motion.div
-              className="absolute -inset-1 bg-gradient-to-r from-green-400/20 to-emerald-400/20 blur-xl"
-              animate={{ opacity: [0.5, 1, 0.5] }}
-              transition={{ duration: 2, repeat: Infinity }}
-            />
-          </motion.h1>
-          
-          <motion.p 
-            className="text-xl md:text-2xl mb-8 text-green-100 max-w-3xl mx-auto leading-relaxed"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.5 }}
-          >
-            Revolutionary Multi-Tenant Fertilizer Inventory Management System for Modern Agriculture
-          </motion.p>
-          
-          <motion.div 
-            className="flex flex-col sm:flex-row gap-4 justify-center"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.8 }}
-          >
-            <motion.button
-              onClick={() => navigate('/login')}
-              className="bg-gradient-to-r from-green-400 to-emerald-500 text-black px-8 py-4 rounded-full text-lg font-bold shadow-2xl hover:shadow-green-400/50 transition-all duration-300 relative overflow-hidden group"
-              whileHover={{ scale: 1.05, y: -2 }}
-              whileTap={{ scale: 0.95 }}
+              initial={{ opacity: 0, x: 50 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.8, delay: 0.2 }}
+              className="relative"
             >
-              <span className="relative z-10">Start Managing Inventory</span>
-              <div className="absolute inset-0 bg-gradient-to-r from-green-300 to-emerald-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-              <motion.div
-                className="absolute inset-0 bg-white/20"
-                initial={{ x: '-100%' }}
-                whileHover={{ x: '100%' }}
-                transition={{ duration: 0.6 }}
-              />
-            </motion.button>
-            
-            <motion.button
-              onClick={() => scrollToSection('features')}
-              className="border-2 border-green-400 text-green-400 hover:bg-green-400 hover:text-black px-8 py-4 rounded-full text-lg font-bold transition-all duration-300 backdrop-blur-sm"
-              whileHover={{ scale: 1.05, y: -2 }}
-              whileTap={{ scale: 0.95 }}
-            >
-              Learn More
-            </motion.button>
-          </motion.div>
-        </motion.div>
+              <div className="bg-gray-100 rounded-2xl p-8 shadow-2xl">
+                <div className="bg-white rounded-lg shadow-lg overflow-hidden">
+                  <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
+                    <div className="flex items-center space-x-2">
+                      <div className="w-3 h-3 bg-red-400 rounded-full"></div>
+                      <div className="w-3 h-3 bg-yellow-400 rounded-full"></div>
+                      <div className="w-3 h-3 bg-green-400 rounded-full"></div>
+                    </div>
+                  </div>
+                  <div className="p-6">
+                    <div className="grid grid-cols-3 gap-4 mb-6">
+                      <div className="bg-green-50 p-4 rounded-lg">
+                        <Package className="h-8 w-8 text-green-500 mb-2" />
+                        <div className="text-2xl font-bold text-gray-900">1,247</div>
+                        <div className="text-sm text-gray-600">Total Products</div>
+                      </div>
+                      <div className="bg-blue-50 p-4 rounded-lg">
+                        <TrendingUp className="h-8 w-8 text-blue-500 mb-2" />
+                        <div className="text-2xl font-bold text-gray-900">₹2.4M</div>
+                        <div className="text-sm text-gray-600">Monthly Sales</div>
+                      </div>
+                      <div className="bg-orange-50 p-4 rounded-lg">
+                        <AlertTriangle className="h-8 w-8 text-orange-500 mb-2" />
+                        <div className="text-2xl font-bold text-gray-900">23</div>
+                        <div className="text-sm text-gray-600">Low Stock</div>
+                      </div>
+                    </div>
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <div className="flex items-center space-x-3">
+                          <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                          <span className="text-sm font-medium">NPK 20-20-20</span>
+                        </div>
+                        <span className="text-sm text-gray-600">850 kg</span>
+                      </div>
+                      <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <div className="flex items-center space-x-3">
+                          <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
+                          <span className="text-sm font-medium">Urea 46%</span>
+                        </div>
+                        <span className="text-sm text-gray-600">1,200 kg</span>
+                      </div>
+                      <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <div className="flex items-center space-x-3">
+                          <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+                          <span className="text-sm font-medium">DAP</span>
+                        </div>
+                        <span className="text-sm text-gray-600">45 kg</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        </div>
+      </section>
 
-        {/* Animated scroll indicator */}
-        <motion.div 
-          className="absolute bottom-8 left-1/2 transform -translate-x-1/2 z-10"
-          animate={{ y: [0, 10, 0] }}
-          transition={{ duration: 2, repeat: Infinity }}
-        >
-          <ChevronDown className="h-8 w-8 text-green-400" />
-        </motion.div>
+      {/* Navigation */}
+      <motion.nav 
+        initial={{ y: -100 }}
+        animate={{ y: 0 }}
+        className="fixed top-0 w-full bg-white/90 backdrop-blur-md border-b border-gray-100 z-50"
+      >
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-16">
+            {/* Logo */}
+            <motion.div 
+              className="flex items-center space-x-3"
+              whileHover={{ scale: 1.02 }}
+            >
+              <img 
+                src="/image-removebg-preview.png" 
+                alt="Logo" 
+                className="h-12 w-auto object-contain"
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none';
+                  const fallback = e.currentTarget.nextElementSibling as HTMLElement;
+                  if (fallback) fallback.style.display = 'flex';
+                }}
+              />
+              <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-emerald-600 rounded-lg items-center justify-center shadow-sm hidden">
+                <Package className="h-4 w-4 text-white" />
+              </div>
+            </motion.div>
+
+            {/* Desktop Navigation */}
+            <div className="hidden md:flex items-center space-x-8">
+              {['features', 'use-cases', 'pricing', 'testimonials'].map((section) => (
+                <button
+                  key={section}
+                  onClick={() => scrollToSection(section)}
+                  className="text-gray-600 hover:text-gray-900 font-medium transition-colors relative group"
+                >
+                  {section === 'use-cases' ? 'Use Cases' : section.charAt(0).toUpperCase() + section.slice(1)}
+                  <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-green-500 group-hover:w-full transition-all duration-300"></span>
+                </button>
+              ))}
+              <motion.button
+                onClick={() => navigate('/login')}
+                className="bg-green-500 hover:bg-green-600 text-white px-6 py-2 rounded-lg font-medium transition-colors"
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+              >
+                Get Started Free
+              </motion.button>
+            </div>
+
+            {/* Mobile menu button */}
+            <div className="md:hidden">
+              <button
+                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                className="text-gray-600 hover:text-gray-900"
+              >
+                {isMobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+              </button>
+            </div>
+          </div>
+
+          {/* Mobile menu */}
+          <AnimatePresence>
+            {isMobileMenuOpen && (
+              <motion.div 
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="md:hidden border-t border-gray-100 bg-white"
+              >
+                <div className="px-4 py-4 space-y-3">
+                  {['features', 'use-cases', 'pricing', 'testimonials'].map((section) => (
+                    <button
+                      key={section}
+                      onClick={() => {
+                        scrollToSection(section);
+                        setIsMobileMenuOpen(false);
+                      }}
+                      className="block text-gray-600 hover:text-gray-900 font-medium"
+                    >
+                      {section === 'use-cases' ? 'Use Cases' : section.charAt(0).toUpperCase() + section.slice(1)}
+                    </button>
+                  ))}
+                  <button
+                    onClick={() => {
+                      navigate('/login');
+                      setIsMobileMenuOpen(false);
+                    }}
+                    className="block w-full text-left bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+                  >
+                    Get Started Free
+                  </button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      </motion.nav>
+
+      {/* Hero Section */}
+      <section className="pt-20 pb-16 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-6xl mx-auto">
+          <div className="grid lg:grid-cols-2 gap-12 items-center">
+            {/* Left Content */}
+            <motion.div
+              initial={{ opacity: 0, x: -50 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.8 }}
+            >
+              <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-gray-900 leading-tight mb-6">
+                Smart Fertilizer Inventory Management for{' '}
+                <span className="text-green-500">Modern Agriculture</span>
+              </h1>
+              <p className="text-xl text-gray-600 mb-8 leading-relaxed">
+                Track, manage, and optimize your fertilizer stock in real-time — reduce waste, boost profits, and simplify operations.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-4">
+                <motion.button
+                  onClick={() => navigate('/login')}
+                  className="bg-green-500 hover:bg-green-600 text-white px-8 py-4 rounded-lg text-lg font-semibold transition-colors inline-flex items-center justify-center"
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  Get Started Free
+                  <ArrowRight className="ml-2 h-5 w-5" />
+                </motion.button>
+                <button
+                  onClick={() => scrollToSection('features')}
+                  className="border border-gray-300 hover:border-gray-400 text-gray-700 px-8 py-4 rounded-lg text-lg font-semibold transition-colors"
+                >
+                  See Features
+                </button>
+              </div>
+            </motion.div>
+
+            {/* Right Content - Dashboard Screenshot */}
+            <motion.div
+              initial={{ opacity: 0, x: 50 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.8, delay: 0.2 }}
+              className="relative"
+            >
+              <div className="bg-gray-100 rounded-2xl p-8 shadow-2xl">
+                <div className="bg-white rounded-lg shadow-lg overflow-hidden">
+                  <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
+                    <div className="flex items-center space-x-2">
+                      <div className="w-3 h-3 bg-red-400 rounded-full"></div>
+                      <div className="w-3 h-3 bg-yellow-400 rounded-full"></div>
+                      <div className="w-3 h-3 bg-green-400 rounded-full"></div>
+                    </div>
+                  </div>
+                  <div className="p-6">
+                    <div className="grid grid-cols-3 gap-4 mb-6">
+                      <div className="bg-green-50 p-4 rounded-lg">
+                        <Package className="h-8 w-8 text-green-500 mb-2" />
+                        <div className="text-2xl font-bold text-gray-900">1,247</div>
+                        <div className="text-sm text-gray-600">Total Products</div>
+                      </div>
+                      <div className="bg-blue-50 p-4 rounded-lg">
+                        <TrendingUp className="h-8 w-8 text-blue-500 mb-2" />
+                        <div className="text-2xl font-bold text-gray-900">₹2.4M</div>
+                        <div className="text-sm text-gray-600">Monthly Sales</div>
+                      </div>
+                      <div className="bg-orange-50 p-4 rounded-lg">
+                        <AlertTriangle className="h-8 w-8 text-orange-500 mb-2" />
+                        <div className="text-2xl font-bold text-gray-900">23</div>
+                        <div className="text-sm text-gray-600">Low Stock</div>
+                      </div>
+                    </div>
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <div className="flex items-center space-x-3">
+                          <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                          <span className="text-sm font-medium">NPK 20-20-20</span>
+                        </div>
+                        <span className="text-sm text-gray-600">850 kg</span>
+                      </div>
+                      <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <div className="flex items-center space-x-3">
+                          <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
+                          <span className="text-sm font-medium">Urea 46%</span>
+                        </div>
+                        <span className="text-sm text-gray-600">1,200 kg</span>
+                      </div>
+                      <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <div className="flex items-center space-x-3">
+                          <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+                          <span className="text-sm font-medium">DAP</span>
+                        </div>
+                        <span className="text-sm text-gray-600">45 kg</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        </div>
       </section>
 
       {/* Features Section */}
-      <section id="features" className="section py-20 bg-gradient-to-b from-gray-900 to-black relative overflow-hidden">
-        {/* Background pattern */}
-        <div className="absolute inset-0 opacity-10">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(16,185,129,0.1),transparent_50%)]"></div>
-        </div>
-        
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+      <section id="features" className="py-20 bg-gray-50">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <motion.div 
             className="text-center mb-16"
-            initial={{ opacity: 0, y: 50 }}
+            initial={{ opacity: 0, y: 30 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            transition={{ duration: 0.8 }}
+            transition={{ duration: 0.6 }}
           >
-            <h2 className="text-4xl md:text-5xl font-bold text-white mb-4">
-              Powerful <span className="bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent">Features</span>
+            <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">
+              Everything you need to manage fertilizer inventory
             </h2>
-            <p className="text-xl text-green-100 max-w-3xl mx-auto">
-              Everything you need to manage your fertilizer inventory efficiently and effectively
+            <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+              Track, manage, and optimize your fertilizer stock with powerful features designed for modern agriculture
             </p>
           </motion.div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
             {[
               {
-                icon: <BarChart3 className="h-12 w-12 text-green-400" />,
-                title: "Real-time Analytics",
-                description: "Track inventory levels, sales trends, and performance metrics in real-time with comprehensive dashboards.",
-                gradient: "from-green-500/20 to-emerald-500/20"
+                icon: <Package className="h-8 w-8 text-green-500" />,
+                title: "Real-Time Stock Tracking",
+                description: "Know exactly how much fertilizer you have — anytime, anywhere."
               },
               {
-                icon: <Shield className="h-12 w-12 text-emerald-400" />,
-                title: "Multi-Tenant Security",
-                description: "Enterprise-grade security with role-based access control and data isolation for multiple organizations.",
-                gradient: "from-emerald-500/20 to-teal-500/20"
+                icon: <AlertTriangle className="h-8 w-8 text-orange-500" />,
+                title: "Expiry & Batch Alerts",
+                description: "Never miss critical stock rotations. Automated reminders reduce losses."
               },
               {
-                icon: <Users className="h-12 w-12 text-green-300" />,
-                title: "Team Collaboration",
-                description: "Enable seamless collaboration between team members with shared workspaces and permission management.",
-                gradient: "from-teal-500/20 to-green-500/20"
+                icon: <Warehouse className="h-8 w-8 text-blue-500" />,
+                title: "Multi-Warehouse Support",
+                description: "Easily manage multiple storage sites with a single dashboard."
               },
               {
-                icon: <Zap className="h-12 w-12 text-yellow-400" />,
-                title: "Lightning Fast",
-                description: "Optimized performance with instant search, real-time updates, and seamless user experience.",
-                gradient: "from-yellow-500/20 to-orange-500/20"
-              },
-              {
-                icon: <TrendingUp className="h-12 w-12 text-blue-400" />,
-                title: "Growth Insights",
-                description: "Advanced analytics and forecasting to help your business grow and optimize inventory management.",
-                gradient: "from-blue-500/20 to-indigo-500/20"
-              },
-              {
-                icon: <Award className="h-12 w-12 text-purple-400" />,
-                title: "Award Winning",
-                description: "Recognized by industry leaders for innovation in agricultural technology and inventory management.",
-                gradient: "from-purple-500/20 to-pink-500/20"
+                icon: <PieChart className="h-8 w-8 text-purple-500" />,
+                title: "Reports & Analytics",
+                description: "Get sales, usage, and stock reports in one click."
               }
             ].map((feature, index) => (
-              <Tilt key={index} tiltMaxAngleX={10} tiltMaxAngleY={10} scale={1.02}>
-                <motion.div
-                  className={`bg-black/40 backdrop-blur-xl border border-green-500/20 p-8 rounded-2xl shadow-2xl hover:shadow-green-400/20 transition-all duration-500 h-full bg-gradient-to-br ${feature.gradient}`}
-                  initial={{ opacity: 0, y: 50 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 0.6, delay: index * 0.1 }}
-                  whileHover={{ y: -5 }}
-                >
-                  <motion.div 
-                    className="mb-6"
-                    whileHover={{ scale: 1.1, rotate: 5 }}
-                    transition={{ duration: 0.3 }}
-                  >
-                    {feature.icon}
-                  </motion.div>
-                  <h3 className="text-xl font-bold text-white mb-4">{feature.title}</h3>
-                  <p className="text-green-100 leading-relaxed">{feature.description}</p>
-                </motion.div>
-              </Tilt>
+              <motion.div
+                key={index}
+                className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow"
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.6, delay: index * 0.1 }}
+              >
+                <div className="mb-4">
+                  {feature.icon}
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">{feature.title}</h3>
+                <p className="text-gray-600 text-sm leading-relaxed">{feature.description}</p>
+              </motion.div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Benefits Section */}
-      <section id="benefits" className="section py-20 bg-gradient-to-b from-black to-gray-900 relative overflow-hidden">
-        {/* Animated background elements */}
-        <div className="absolute inset-0">
-          {[...Array(20)].map((_, i) => (
-            <motion.div
-              key={i}
-              className="absolute w-2 h-2 bg-green-400/20 rounded-full"
-              style={{
-                left: `${Math.random() * 100}%`,
-                top: `${Math.random() * 100}%`,
-              }}
-              animate={{
-                scale: [1, 1.5, 1],
-                opacity: [0.2, 0.8, 0.2],
-              }}
-              transition={{
+      {/* Use Cases Section */}
+      <section id="use-cases" className="py-20 bg-white">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <motion.div 
+            className="text-center mb-16"
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6 }}
+          >
+            <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">
+              Perfect for every agricultural business
+            </h2>
+            <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+              From small farms to large distributors, our solution scales with your needs
+            </p>
+          </motion.div>
+
+          <div className="grid md:grid-cols-3 gap-8">
+            {[
+              {
+                icon: <Users className="h-12 w-12 text-green-500" />,
+                title: "👨‍🌾 Farmers",
+                description: "Track stock and avoid waste with smart inventory management tailored for farm operations."
+              },
+              {
+                icon: <Warehouse className="h-12 w-12 text-blue-500" />,
+                title: "🏬 Distributors",
+                description: "Manage multiple warehouses and streamline distribution across different locations."
+              },
+              {
+                icon: <BarChart3 className="h-12 w-12 text-purple-500" />,
+                title: "🏢 Agri-Retailers",
+                description: "Speed up sales and avoid stockouts with real-time inventory tracking and alerts."
+              }
+            ].map((useCase, index) => (
+              <motion.div
+                key={index}
+                className="bg-gray-50 p-8 rounded-xl text-center hover:shadow-md transition-shadow"
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.6, delay: index * 0.1 }}
+              >
+                <div className="mb-6 flex justify-center">
+                  {useCase.icon}
+                </div>
+                <h3 className="text-xl font-semibold text-gray-900 mb-4">{useCase.title}</h3>
+                <p className="text-gray-600 leading-relaxed">{useCase.description}</p>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Pricing Section */}
+      <section id="pricing" className="py-20 bg-gray-50">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <motion.div 
+            className="text-center mb-16"
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6 }}
+          >
+            <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">
+              Simple, transparent pricing
+            </h2>
+            <p className="text-lg text-gray-600">
+              Choose the plan that fits your business needs
+            </p>
+          </motion.div>
+
+          <div className="grid md:grid-cols-3 gap-8">
+            {[
+              {
+                name: "Free",
+                price: "₹0",
+                period: "/month",
+                description: "Perfect for small farms getting started",
+                features: [
+                  "Up to 50 products",
+                  "Basic inventory tracking",
+                  "Email support",
+                  "Mobile app access"
+                ],
+                cta: "Start Free",
+                popular: false
+              },
+              {
+                name: "Pro",
+                price: "₹999",
+                period: "/month",
+                description: "Ideal for growing agricultural businesses",
+                features: [
+                  "Unlimited products",
+                  "Multi-warehouse support",
+                  "Advanced analytics",
+                  "Batch tracking & alerts",
+                  "Priority support",
+                  "API access"
+                ],
+                cta: "Start Free Trial",
+                popular: true
+              },
+              {
+                name: "Enterprise",
+                price: "Custom",
+                period: "",
+                description: "For large operations with custom needs",
+                features: [
+                  "Everything in Pro",
+                  "Custom integrations",
+                  "Dedicated support",
+                  "On-premise deployment",
+                  "Training & onboarding",
+                  "SLA guarantee"
+                ],
+                cta: "Contact Sales",
+                popular: false
+              }
+            ].map((plan, index) => (
+              <motion.div
+                key={index}
+                className={`bg-white p-8 rounded-xl shadow-sm border ${
+                  plan.popular ? 'border-green-500 ring-2 ring-green-500 ring-opacity-20' : 'border-gray-100'
+                } hover:shadow-md transition-shadow relative`}
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.6, delay: index * 0.1 }}
+              >
+                {plan.popular && (
+                  <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
+                    <span className="bg-green-500 text-white px-4 py-1 rounded-full text-sm font-medium">
+                      Most Popular
+                    </span>
+                  </div>
+                )}
+                <div className="text-center">
+                  <h3 className="text-xl font-semibold text-gray-900 mb-2">{plan.name}</h3>
+                  <div className="mb-4">
+                    <span className="text-4xl font-bold text-gray-900">{plan.price}</span>
+                    <span className="text-gray-600">{plan.period}</span>
+                  </div>
+                  <p className="text-gray-600 mb-6">{plan.description}</p>
+                  <ul className="space-y-3 mb-8">
+                    {plan.features.map((feature, featureIndex) => (
+                      <li key={featureIndex} className="flex items-center space-x-3">
+                        <CheckCircle className="h-5 w-5 text-green-500 flex-shrink-0" />
+                        <span className="text-gray-700">{feature}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <button
+                    onClick={() => navigate('/login')}
+                    className={`w-full py-3 px-6 rounded-lg font-semibold transition-colors ${
+                      plan.popular
+                        ? 'bg-green-500 hover:bg-green-600 text-white'
+                        : 'bg-gray-100 hover:bg-gray-200 text-gray-900'
+                    }`}
+                  >
+                    {plan.cta}
+                  </button>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Testimonials Section */}
+      <section id="testimonials" className="py-20 bg-white">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <motion.div 
+            className="text-center mb-16"
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6 }}
+          >
+            <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">
+              What our customers say
+            </h2>
+            <p className="text-lg text-gray-600">
+              Real feedback from agricultural businesses using our platform
+            </p>
+          </motion.div>
+
+          <div className="grid md:grid-cols-2 gap-8">
+            {[
+              {
+                quote: "The real-time tracking has been a game-changer for our fertilizer distribution. We've reduced waste by 40% and improved customer satisfaction.",
+                author: "Rajesh Kumar",
+                title: "Owner, Kumar Agri Supplies",
+                location: "Punjab"
+              },
+              {
+                quote: "Managing multiple warehouses was a nightmare before. Now everything is centralized and we can track inventory across all locations effortlessly.",
+                author: "Priya Sharma",
+                title: "Operations Manager",
+                location: "Maharashtra Cooperative"
+              }
+            ].map((testimonial, index) => (
+              <motion.div
+                key={index}
+                className="bg-gray-50 p-8 rounded-xl"
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.6, delay: index * 0.1 }}
+              >
+                <div className="flex justify-center space-x-1 mb-4">
+                  {[...Array(5)].map((_, i) => (
+                    <Star key={i} className="h-5 w-5 text-yellow-400 fill-current" />
+                  ))}
+                </div>
+                <p className="text-gray-700 italic mb-6 leading-relaxed">
+                  "{testimonial.quote}"
+                </p>
+                <div className="text-center">
+                  <div className="font-semibold text-gray-900">{testimonial.author}</div>
+                  <div className="text-sm text-gray-600">{testimonial.title}</div>
+                  <div className="text-sm text-gray-500">{testimonial.location}</div>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Final CTA Section */}
+      <section className="py-20 bg-gradient-to-br from-green-50 to-blue-50">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6 }}
+          >
+            <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-6">
+              Ready to take control of your fertilizer inventory?
+            </h2>
+            <p className="text-lg text-gray-600 mb-8 max-w-2xl mx-auto">
+              Join thousands of agricultural businesses who have streamlined their operations with our platform.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <motion.button
+                onClick={() => navigate('/login')}
+                className="bg-green-500 hover:bg-green-600 text-white px-8 py-4 rounded-lg text-lg font-semibold transition-colors inline-flex items-center justify-center"
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+              >
+                Start Free Trial
+                <ArrowRight className="ml-2 h-5 w-5" />
+              </motion.button>
+              <button className="border border-gray-300 hover:border-gray-400 text-gray-700 px-8 py-4 rounded-lg text-lg font-semibold transition-colors">
+                Schedule Demo
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="bg-gray-900 text-white py-16">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid md:grid-cols-4 gap-8">
+            <div>
+              <div className="flex items-center space-x-3 mb-4">
+                <img 
+                  src="/image-removebg-preview.png" 
+                  alt="Logo" 
+                  className="h-8 w-auto object-contain"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                    const fallback = e.currentTarget.nextElementSibling as HTMLElement;
+                    if (fallback) fallback.style.display = 'flex';
+                  }}
+                />
+                <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-emerald-600 rounded-lg items-center justify-center shadow-sm hidden">
+                  <Package className="h-4 w-4 text-white" />
+                </div>
+              </div>
+              <p className="text-gray-400 text-sm leading-relaxed">
+                Modern fertilizer inventory management for agricultural businesses of all sizes.
+              </p>
+            </div>
+            
+            <div>
+              <h3 className="font-semibold mb-4">Product</h3>
+              <ul className="space-y-2 text-sm text-gray-400">
+                <li><a href="#features" className="hover:text-white transition-colors">Features</a></li>
+                <li><a href="#pricing" className="hover:text-white transition-colors">Pricing</a></li>
+                <li><a href="#use-cases" className="hover:text-white transition-colors">Use Cases</a></li>
+                <li><a href="#testimonials" className="hover:text-white transition-colors">Testimonials</a></li>
+              </ul>
+            </div>
+            
+            <div>
+              <h3 className="font-semibold mb-4">Support</h3>
+              <ul className="space-y-2 text-sm text-gray-400">
+                <li><a href="#" className="hover:text-white transition-colors">Documentation</a></li>
+                <li><a href="#" className="hover:text-white transition-colors">Help Center</a></li>
+                <li><a href="#" className="hover:text-white transition-colors">Contact Us</a></li>
+                <li><a href="#" className="hover:text-white transition-colors">API Reference</a></li>
+              </ul>
+            </div>
+            
+            <div>
+              <h3 className="font-semibold mb-4">Contact</h3>
+              <ul className="space-y-2 text-sm text-gray-400">
+                <li className="flex items-center space-x-2">
+                  <Mail className="h-4 w-4" />
+                  <span>support@example.com</span>
+                </li>
+                <li className="flex items-center space-x-2">
+                  <Phone className="h-4 w-4" />
+                  <span>+91 98765 43210</span>
+                </li>
+                <li className="flex items-center space-x-2">
+                  <Globe className="h-4 w-4" />
+                  <span>www.example.com</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+          
+          <div className="border-t border-gray-800 mt-12 pt-8 text-center">
+            <p className="text-gray-400 text-sm">
+              © 2024 Fertilizer Inventory Management System. All rights reserved.
+            </p>
+          </div>
+        </div>
+      </footer>
+    </div>
+  );
+};
+
+export default LandingPage;
+                          <div className="w-32 bg-gray-200 rounded-full h-2">
+                            <div className="bg-blue-500 h-2 rounded-full" style={{width: '60%'}}></div>
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-3">
+                            <div className="w-3 h-3 bg-orange-500 rounded-full"></div>
+                            <span className="text-sm">Adjustments</span>
+                          </div>
+                          <div className="w-32 bg-gray-200 rounded-full h-2">
+                            <div className="bg-orange-500 h-2 rounded-full" style={{width: '25%'}}></div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="bg-gray-50 p-3 rounded-lg">
+                        <div className="text-sm text-gray-600">This Month</div>
+                        <div className="text-xl font-bold text-gray-900">₹1.2M</div>
+                      </div>
+                      <div className="bg-gray-50 p-3 rounded-lg">
+                        <div className="text-sm text-gray-600">Growth</div>
+                        <div className="text-xl font-bold text-green-600">+12%</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+      {/* Use Cases Section */}
+      <section id="use-cases" className="py-20 bg-gray-50">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
                 duration: Math.random() * 3 + 2,
                 repeat: Infinity,
                 delay: Math.random() * 2,
               }}
             />
-          ))}
+          })}
         </div>
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
@@ -657,17 +896,17 @@ const LandingPage: React.FC = () => {
             viewport={{ once: true }}
             transition={{ duration: 0.8 }}
           >
-            <h2 className="text-4xl md:text-5xl font-bold text-white mb-4">
-              Why Choose <span className="bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent">KrishiSethu?</span>
+            <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
+              Why Choose <span className="bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">KrishiSethu?</span>
             </h2>
-            <p className="text-xl text-green-100 max-w-3xl mx-auto">
+            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
               Transform your agricultural business with our comprehensive inventory management solution
             </p>
           </motion.div>
 
           <div className="text-center">
             <motion.p 
-              className="text-xl text-green-100 max-w-3xl mx-auto leading-relaxed"
+              className="text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed"
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
@@ -690,7 +929,7 @@ const LandingPage: React.FC = () => {
                   <div className="w-[120px] h-[120px] flex items-center justify-center mb-3">
                     <InventoryWarehouseLottie size="md" className="w-full h-full" />
                   </div>
-                  <p className="text-green-100 text-base font-medium text-center">Smart Inventory</p>
+                  <p className="text-gray-600 text-base font-medium text-center">Smart Inventory</p>
                 </motion.div>
                 
                 <motion.div 
@@ -703,7 +942,7 @@ const LandingPage: React.FC = () => {
                   <div className="w-[120px] h-[120px] flex items-center justify-center mb-3">
                     <FertilizerSpreadingLottie size="md" className="w-full h-full" />
                   </div>
-                  <p className="text-yellow-100 text-base font-medium text-center">Precision Distribution</p>
+                  <p className="text-yellow-600 text-base font-medium text-center">Precision Distribution</p>
                 </motion.div>
                 
                 <motion.div 
@@ -716,7 +955,7 @@ const LandingPage: React.FC = () => {
                   <div className="w-[120px] h-[120px] flex items-center justify-center mb-3">
                     <AnalyticsChartLottie size="md" className="w-full h-full" />
                   </div>
-                  <p className="text-blue-100 text-base font-medium text-center">Advanced Analytics</p>
+                  <p className="text-blue-600 text-base font-medium text-center">Advanced Analytics</p>
                 </motion.div>
               </div>
             </div>
@@ -730,21 +969,15 @@ const LandingPage: React.FC = () => {
               transition={{ duration: 0.8 }}
             >
               <Tilt tiltMaxAngleX={15} tiltMaxAngleY={15} scale={1.05}>
-                <div className="bg-black/60 backdrop-blur-xl border border-green-500/30 p-8 rounded-3xl shadow-2xl relative overflow-hidden">
+                <div className="bg-white/30 backdrop-blur-xl border border-gray-200/50 p-8 rounded-3xl shadow-2xl relative overflow-hidden hover:border-green-400/40 transition-all duration-500">
                   {/* Glowing background effect */}
-                  <div className="absolute inset-0 bg-gradient-to-br from-green-500/10 to-emerald-500/10"></div>
+                  <div className="absolute inset-0 bg-gradient-to-br from-green-500/5 to-emerald-500/5"></div>
                   
                   <div className="text-center relative z-10">
-                    <motion.div 
-                      className="text-5xl font-bold bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent mb-2"
-                      initial={{ scale: 0 }}
-                      whileInView={{ scale: 1 }}
-                      viewport={{ once: true }}
-                      transition={{ duration: 0.8, delay: 0.3 }}
-                    >
+                    <div className="text-5xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent mb-2">
                       10,000+
-                    </motion.div>
-                    <div className="text-green-100 mb-6 text-lg">Farmers Trust KrishiSethu</div>
+                    </div>
+                    <div className="text-gray-600 mb-6 text-lg">Farmers Trust KrishiSethu</div>
                     <div className="flex justify-center space-x-1 mb-6">
                       {[...Array(5)].map((_, i) => (
                         <motion.div
@@ -758,15 +991,15 @@ const LandingPage: React.FC = () => {
                         </motion.div>
                       ))}
                     </div>
-                    <p className="text-green-100 italic leading-relaxed mb-4">
+                    <p className="text-gray-600 italic leading-relaxed mb-4">
                       "KrishiSethu has revolutionized how we manage our fertilizer inventory. The real-time tracking and analytics have helped us reduce waste and increase profitability."
                     </p>
-                    <div className="text-white font-bold">- Agricultural Cooperative</div>
+                    <div className="text-gray-900 font-bold">- Agricultural Cooperative</div>
                   </div>
                   
                   {/* Decorative elements */}
-                  <div className="absolute top-4 right-4 w-20 h-20 bg-gradient-to-br from-green-400/20 to-emerald-400/20 rounded-full blur-xl"></div>
-                  <div className="absolute bottom-4 left-4 w-16 h-16 bg-gradient-to-br from-emerald-400/20 to-green-400/20 rounded-full blur-xl"></div>
+                  <div className="absolute top-4 right-4 w-20 h-20 bg-gradient-to-br from-green-600/10 to-emerald-600/10 rounded-full blur-xl"></div>
+                  <div className="absolute bottom-4 left-4 w-16 h-16 bg-gradient-to-br from-emerald-600/10 to-green-600/10 rounded-full blur-xl"></div>
                 </div>
               </Tilt>
             </motion.div>
@@ -774,12 +1007,12 @@ const LandingPage: React.FC = () => {
       </section>
 
       {/* Gallery Section */}
-      <section id="gallery" className="section py-20 bg-gradient-to-b from-gray-900 to-black relative overflow-hidden">
+      <section id="gallery" className="section py-20 bg-white relative overflow-hidden">
         {/* Background grid pattern */}
         <div className="absolute inset-0 opacity-5">
           <div className="absolute inset-0" style={{
-            backgroundImage: `radial-gradient(circle at 25% 25%, rgba(16,185,129,0.2) 2px, transparent 2px),
-                             radial-gradient(circle at 75% 75%, rgba(16,185,129,0.2) 2px, transparent 2px)`,
+            backgroundImage: `radial-gradient(circle at 25% 25%, rgba(16,185,129,0.1) 2px, transparent 2px),
+                             radial-gradient(circle at 75% 75%, rgba(16,185,129,0.1) 2px, transparent 2px)`,
             backgroundSize: '60px 60px'
           }}></div>
         </div>
@@ -792,10 +1025,10 @@ const LandingPage: React.FC = () => {
             viewport={{ once: true }}
             transition={{ duration: 0.8 }}
           >
-            <h2 className="text-4xl md:text-5xl font-bold text-white mb-4">
-              See It In <span className="bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent">Action</span>
+            <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
+              See It In <span className="bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">Action</span>
             </h2>
-            <p className="text-xl text-green-100 max-w-3xl mx-auto">
+            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
               Explore our intuitive interface and powerful features in real agricultural environments
             </p>
           </motion.div>
@@ -809,11 +1042,11 @@ const LandingPage: React.FC = () => {
               transition={{ duration: 0.6, delay: 0.1 }}
             >
               <Tilt tiltMaxAngleX={10} tiltMaxAngleY={10} scale={1.02}>
-                <div className="bg-black/40 backdrop-blur-xl border border-green-500/20 rounded-3xl p-8 hover:border-green-400/40 transition-all duration-500 group">
+                <div className="bg-white/20 backdrop-blur-xl border border-gray-200/50 rounded-3xl p-8 hover:border-green-400/40 transition-all duration-500 group">
                   <InventoryWarehouseLottie size="xl" />
                   <div className="mt-6 text-center">
-                    <h3 className="text-xl font-bold text-white mb-2">Warehouse Management</h3>
-                    <p className="text-green-100 text-sm">Real-time inventory tracking and warehouse optimization</p>
+                    <h3 className="text-xl font-bold text-gray-900 mb-2">Warehouse Management</h3>
+                    <p className="text-gray-600 text-sm">Real-time inventory tracking and warehouse optimization</p>
                   </div>
                 </div>
               </Tilt>
@@ -826,11 +1059,11 @@ const LandingPage: React.FC = () => {
               transition={{ duration: 0.6, delay: 0.2 }}
             >
               <Tilt tiltMaxAngleX={10} tiltMaxAngleY={10} scale={1.02}>
-                <div className="bg-black/40 backdrop-blur-xl border border-yellow-500/20 rounded-3xl p-8 hover:border-yellow-400/40 transition-all duration-500 group">
+                <div className="bg-white/20 backdrop-blur-xl border border-yellow-400/30 rounded-3xl p-8 hover:border-yellow-400/50 transition-all duration-500 group">
                   <FertilizerSpreadingLottie size="xl" />
                   <div className="mt-6 text-center">
-                    <h3 className="text-xl font-bold text-white mb-2">Smart Distribution</h3>
-                    <p className="text-green-100 text-sm">Automated fertilizer distribution and field management</p>
+                    <h3 className="text-xl font-bold text-gray-900 mb-2">Smart Distribution</h3>
+                    <p className="text-gray-600 text-sm">Automated fertilizer distribution and field management</p>
                   </div>
                 </div>
               </Tilt>
@@ -843,11 +1076,11 @@ const LandingPage: React.FC = () => {
               transition={{ duration: 0.6, delay: 0.3 }}
             >
               <Tilt tiltMaxAngleX={10} tiltMaxAngleY={10} scale={1.02}>
-                <div className="bg-black/40 backdrop-blur-xl border border-blue-500/20 rounded-3xl p-8 hover:border-blue-400/40 transition-all duration-500 group">
+                <div className="bg-white/20 backdrop-blur-xl border border-blue-400/30 rounded-3xl p-8 hover:border-blue-400/50 transition-all duration-500 group">
                   <AnalyticsChartLottie size="xl" />
                   <div className="mt-6 text-center">
-                    <h3 className="text-xl font-bold text-white mb-2">Advanced Analytics</h3>
-                    <p className="text-green-100 text-sm">Data-driven insights and predictive analytics</p>
+                    <h3 className="text-xl font-bold text-gray-900 mb-2">Advanced Analytics</h3>
+                    <p className="text-gray-600 text-sm">Data-driven insights and predictive analytics</p>
                   </div>
                 </div>
               </Tilt>
@@ -862,11 +1095,11 @@ const LandingPage: React.FC = () => {
             viewport={{ once: true }}
             transition={{ duration: 0.8 }}
           >
-            <div className="bg-gradient-to-r from-green-900/30 to-emerald-900/30 backdrop-blur-xl border border-green-500/30 rounded-3xl p-12 relative overflow-hidden">
+            <div className="bg-gradient-to-r from-green-50 to-emerald-50 backdrop-blur-xl border border-green-200/50 rounded-3xl p-12 relative overflow-hidden">
               <div className="absolute inset-0 bg-gradient-to-br from-green-500/5 to-emerald-500/5"></div>
               <div className="relative z-10">
-                <h3 className="text-3xl font-bold text-white mb-4">Ready to Experience KrishiSethu?</h3>
-                <p className="text-green-100 text-lg mb-8 max-w-2xl mx-auto">
+                <h3 className="text-3xl font-bold text-gray-900 mb-4">Ready to Experience KrishiSethu?</h3>
+                <p className="text-gray-600 text-lg mb-8 max-w-2xl mx-auto">
                   See how our platform transforms agricultural inventory management with live demonstrations and interactive features.
                 </p>
                 <motion.button
@@ -894,7 +1127,7 @@ const LandingPage: React.FC = () => {
       </section>
 
       {/* Testimonials Section */}
-      <section id="testimonials" className="section py-20 bg-gradient-to-br from-gray-50 to-gray-100">
+      <section id="testimonials" className="section py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
@@ -928,9 +1161,7 @@ const LandingPage: React.FC = () => {
             ].map((testimonial, index) => (
               <div
                 key={index}
-                className={`bg-white p-8 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 ${
-                  isVisible.testimonials ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
-                }`}
+                className={`bg-white/20 backdrop-blur-xl p-8 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 border border-gray-200/50 hover:border-green-400/40`}
                 style={{ transitionDelay: `${index * 150}ms` }}
               >
                 <div className="flex space-x-1 mb-4">
@@ -938,7 +1169,7 @@ const LandingPage: React.FC = () => {
                     <Star key={i} className="h-5 w-5 text-yellow-400 fill-current" />
                   ))}
                 </div>
-                <p className="text-gray-600 mb-6 italic">"{testimonial.content}"</p>
+                <p className="text-gray-700 mb-6 italic">"{testimonial.content}"</p>
                 <div>
                   <div className="font-semibold text-gray-900">{testimonial.name}</div>
                   <div className="text-gray-500 text-sm">{testimonial.role}</div>
@@ -950,7 +1181,7 @@ const LandingPage: React.FC = () => {
       </section>
 
       {/* Pricing Section */}
-      <section id="pricing" className="section py-20 bg-gradient-to-b from-slate-900 via-gray-900 to-black relative overflow-hidden">
+      <section id="pricing" className="section py-20 bg-white relative overflow-hidden">
         {/* Background effects */}
         <div className="absolute inset-0 bg-gradient-to-br from-green-500/5 via-transparent to-emerald-500/5"></div>
         <div className="absolute top-0 left-1/4 w-96 h-96 bg-green-500/10 rounded-full blur-3xl"></div>
@@ -964,10 +1195,10 @@ const LandingPage: React.FC = () => {
             viewport={{ once: true }}
             transition={{ duration: 0.8 }}
           >
-            <h2 className="text-4xl md:text-5xl font-bold text-white mb-6 bg-gradient-to-r from-green-400 via-emerald-400 to-green-300 bg-clip-text text-transparent">
+            <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6 bg-gradient-to-r from-green-600 via-emerald-600 to-green-500 bg-clip-text text-transparent">
               Simple Pricing
             </h2>
-            <p className="text-xl text-gray-300 max-w-3xl mx-auto">
+            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
               Choose the plan that fits your agricultural business needs
             </p>
           </motion.div>
@@ -982,7 +1213,7 @@ const LandingPage: React.FC = () => {
               viewport={{ once: true }}
               transition={{ duration: 0.8, delay: 0.2 }}
             >
-              <div className="bg-white/10 backdrop-blur-xl rounded-3xl p-8 shadow-2xl border border-white/20 relative overflow-hidden group hover:border-blue-400/40 transition-all duration-500 h-full">
+              <div className="bg-white/20 backdrop-blur-xl rounded-3xl p-8 shadow-2xl border border-gray-200/50 relative overflow-hidden group hover:border-blue-400/40 transition-all duration-500 h-full">
                 {/* Shiny overlay effect */}
                 <div className="absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-white/5 rounded-3xl"></div>
                 
@@ -991,19 +1222,19 @@ const LandingPage: React.FC = () => {
                 
                 <div className="relative z-10 h-full flex flex-col">
                   <div className="text-center mb-6">
-                    <h3 className="text-2xl font-bold text-white mb-2">Monthly Plan</h3>
-                    <p className="text-gray-300 text-sm">Perfect for getting started</p>
+                    <h3 className="text-2xl font-bold text-gray-900 mb-2">Monthly Plan</h3>
+                    <p className="text-gray-600 text-sm">Perfect for getting started</p>
                   </div>
 
                   <div className="text-center mb-6">
                     <div className="flex items-center justify-center mb-2">
-                      <span className="text-5xl font-bold text-blue-400">₹16,800</span>
-                      <span className="text-xl text-gray-400 ml-2">/month</span>
+                      <span className="text-5xl font-bold text-blue-600">₹16,800</span>
+                      <span className="text-xl text-gray-500 ml-2">/month</span>
                     </div>
-                    <p className="text-gray-400 text-sm">Billed monthly</p>
+                    <p className="text-gray-500 text-sm">Billed monthly</p>
                   </div>
 
-                  <ul className="text-gray-300 mb-8 space-y-3 flex-grow">
+                  <ul className="text-gray-600 mb-8 space-y-3 flex-grow">
                     {[
                       "✅ Unlimited Fertilizer Inventory",
                       "✅ Multi-Tenant Farm Access",
@@ -1021,7 +1252,7 @@ const LandingPage: React.FC = () => {
                         viewport={{ once: true }}
                         transition={{ duration: 0.4, delay: 0.4 + index * 0.1 }}
                       >
-                        <span className="text-blue-400 font-semibold">{feature.split(' ')[0]}</span>
+                        <span className="text-blue-600 font-semibold">{feature.split(' ')[0]}</span>
                         <span>{feature.substring(feature.indexOf(' ') + 1)}</span>
                       </motion.li>
                     ))}
@@ -1060,7 +1291,7 @@ const LandingPage: React.FC = () => {
                 </span>
               </div>
               
-              <div className="bg-white/15 backdrop-blur-xl rounded-3xl p-8 shadow-2xl border-2 border-green-400/40 relative overflow-hidden group hover:border-green-400/60 transition-all duration-500 h-full">
+              <div className="bg-white/25 backdrop-blur-xl rounded-3xl p-8 shadow-2xl border-2 border-green-400/50 relative overflow-hidden group hover:border-green-400/60 transition-all duration-500 h-full">
                 {/* Shiny overlay effect */}
                 <div className="absolute inset-0 bg-gradient-to-br from-white/15 via-transparent to-white/10 rounded-3xl"></div>
                 
@@ -1069,24 +1300,24 @@ const LandingPage: React.FC = () => {
                 
                 <div className="relative z-10 h-full flex flex-col pt-4">
                   <div className="text-center mb-6">
-                    <h3 className="text-2xl font-bold text-white mb-2">Annual Plan</h3>
-                    <p className="text-gray-300 text-sm">Best value for growing businesses</p>
+                    <h3 className="text-2xl font-bold text-gray-900 mb-2">Annual Plan</h3>
+                    <p className="text-gray-600 text-sm">Best value for growing businesses</p>
                   </div>
 
                   <div className="text-center mb-6">
                     <div className="flex items-center justify-center mb-2">
-                      <span className="text-5xl font-bold text-green-400">₹1,68,000</span>
-                      <span className="text-xl text-gray-400 ml-2">/year</span>
+                      <span className="text-5xl font-bold text-green-600">₹1,68,000</span>
+                      <span className="text-xl text-gray-500 ml-2">/year</span>
                     </div>
                     <div className="space-y-1">
-                      <p className="text-gray-400 text-sm">Billed annually</p>
-                      <div className="inline-block bg-gradient-to-r from-green-500/20 to-emerald-500/20 text-green-400 px-4 py-1 rounded-full text-xs font-semibold border border-green-400/30">
+                      <p className="text-gray-500 text-sm">Billed annually</p>
+                      <div className="inline-block bg-gradient-to-r from-green-500/20 to-emerald-500/20 text-green-600 px-4 py-1 rounded-full text-xs font-semibold border border-green-400/30">
                         Save ₹33,600 (17% off)
                       </div>
                     </div>
                   </div>
 
-                  <ul className="text-gray-300 mb-8 space-y-3 flex-grow">
+                  <ul className="text-gray-600 mb-8 space-y-3 flex-grow">
                     {[
                       "✅ Everything in Monthly Plan",
                       "✅ Priority 24/7 Support",
@@ -1104,7 +1335,7 @@ const LandingPage: React.FC = () => {
                         viewport={{ once: true }}
                         transition={{ duration: 0.4, delay: 0.6 + index * 0.1 }}
                       >
-                        <span className="text-green-400 font-semibold">{feature.split(' ')[0]}</span>
+                        <span className="text-green-600 font-semibold">{feature.split(' ')[0]}</span>
                         <span>{feature.substring(feature.indexOf(' ') + 1)}</span>
                       </motion.li>
                     ))}
@@ -1112,7 +1343,7 @@ const LandingPage: React.FC = () => {
 
                   <motion.button 
                     onClick={() => navigate('/login')}
-                    className="w-full py-3 rounded-xl bg-gradient-to-r from-green-500 to-emerald-600 text-black font-bold hover:from-green-400 hover:to-emerald-500 transition-all duration-300 transform hover:scale-[1.02] active:scale-[0.98] shadow-2xl hover:shadow-green-400/50 relative overflow-hidden group"
+                    className="w-full py-3 rounded-xl bg-gradient-to-r from-green-500 to-emerald-600 text-white font-bold hover:from-green-400 hover:to-emerald-500 transition-all duration-300 transform hover:scale-[1.02] active:scale-[0.98] shadow-2xl hover:shadow-green-400/50 relative overflow-hidden group"
                     whileHover={{ y: -2 }}
                     whileTap={{ scale: 0.98 }}
                   >
@@ -1137,7 +1368,7 @@ const LandingPage: React.FC = () => {
             viewport={{ once: true }}
             transition={{ duration: 0.6, delay: 0.8 }}
           >
-            <p className="text-gray-400 text-sm">
+            <p className="text-gray-500 text-sm">
               No setup fees • Cancel anytime • 30-day money-back guarantee • Secure payments
             </p>
           </motion.div>
@@ -1145,18 +1376,19 @@ const LandingPage: React.FC = () => {
       </section>
 
       {/* CTA Section */}
-      <section id="contact" className="section py-20 bg-gradient-to-r from-emerald-600 to-green-700">
-        <div className="max-w-4xl mx-auto text-center px-4 sm:px-6 lg:px-8">
-          <h2 className="text-4xl md:text-5xl font-bold text-white mb-6">
+      <section id="contact" className="section py-20 bg-white relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-r from-green-500/5 to-emerald-500/5"></div>
+        <div className="max-w-4xl mx-auto text-center px-4 sm:px-6 lg:px-8 relative z-10">
+          <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6">
             Ready to Transform Your Agriculture Business?
           </h2>
-          <p className="text-xl text-emerald-100 mb-8 max-w-2xl mx-auto">
+          <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
             Join thousands of farmers and agricultural businesses who trust KrishiSethu for their inventory management needs.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <button
               onClick={() => navigate('/login')}
-              className="bg-white text-emerald-600 hover:bg-gray-100 px-8 py-4 rounded-full text-lg font-semibold transition-all duration-300 transform hover:scale-105 shadow-lg"
+              className="bg-gradient-to-r from-green-600 to-emerald-600 text-white hover:from-green-700 hover:to-emerald-700 px-8 py-4 rounded-full text-lg font-semibold transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-green-600/50"
             >
               Get Started Today
               <ArrowRight className="inline-block ml-2 h-5 w-5" />
@@ -1166,8 +1398,7 @@ const LandingPage: React.FC = () => {
       </section>
 
       {/* Footer */}
-      <footer className="bg-gradient-to-b from-gray-900 to-black text-white py-16 relative overflow-hidden">
-        {/* Background pattern */}
+      <footer className="bg-white text-gray-900 py-16 relative overflow-hidden border-t border-gray-200">
         <div className="absolute inset-0 opacity-5">
           <div className="absolute inset-0" style={{
             backgroundImage: `radial-gradient(circle at 25% 25%, rgba(16,185,129,0.3) 2px, transparent 2px),
@@ -1178,7 +1409,6 @@ const LandingPage: React.FC = () => {
         
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
           <div className="text-center">
-            {/* Enhanced Logo */}
             <motion.div 
               className="flex items-center justify-center space-x-3 mb-6"
               initial={{ opacity: 0, y: 20 }}
@@ -1187,13 +1417,12 @@ const LandingPage: React.FC = () => {
               transition={{ duration: 0.6 }}
             >
               <div className="relative">
-                <div className="absolute inset-0 bg-white/40 blur-2xl rounded-full transform scale-125"></div>
+                <div className="absolute inset-0 bg-gray-200/50 blur-2xl rounded-full transform scale-125"></div>
                 <img 
                   src="/image-removebg-preview.png" 
                   alt="KrishiSethu Logo" 
                   className="h-16 w-auto object-contain relative z-10"
                   onError={(e) => {
-                    // Fallback to gradient icon if logo fails to load
                     e.currentTarget.style.display = 'none';
                     const nextElement = e.currentTarget.parentElement?.nextElementSibling as HTMLElement;
                     if (nextElement) {
@@ -1202,13 +1431,13 @@ const LandingPage: React.FC = () => {
                   }}
                 />
                 <div className="w-12 h-12 bg-gradient-to-br from-green-400 to-emerald-500 rounded-full items-center justify-center shadow-xl hidden">
-                  <span className="text-black font-bold text-xl">🌾</span>
+                  <span className="text-white font-bold text-xl">🌾</span>
                 </div>
               </div>
             </motion.div>
             
             <motion.p 
-              className="text-green-100 mb-8 text-lg max-w-2xl mx-auto"
+              className="text-gray-600 mb-8 text-lg max-w-2xl mx-auto"
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
@@ -1217,7 +1446,6 @@ const LandingPage: React.FC = () => {
               Empowering agriculture through intelligent inventory management
             </motion.p>
             
-            {/* Social Icons */}
             <motion.div 
               className="flex justify-center space-x-6 mb-8"
               initial={{ opacity: 0, y: 20 }}
@@ -1233,7 +1461,7 @@ const LandingPage: React.FC = () => {
               ].map((social) => (
                 <motion.div
                   key={social.label}
-                  className={`w-12 h-12 bg-gradient-to-br ${social.color} rounded-full flex items-center justify-center cursor-pointer shadow-lg hover:shadow-xl transition-all duration-300`}
+                  className={`w-12 h-12 bg-gradient-to-br ${social.color} rounded-full flex items-center justify-center cursor-pointer shadow-lg hover:shadow-xl transition-all duration-300 text-white`}
                   whileHover={{ scale: 1.1, y: -2 }}
                   whileTap={{ scale: 0.95 }}
                 >
@@ -1243,22 +1471,21 @@ const LandingPage: React.FC = () => {
             </motion.div>
             
             <motion.div 
-              className="border-t border-green-500/20 pt-8"
+              className="border-t border-gray-200 pt-8"
               initial={{ opacity: 0 }}
               whileInView={{ opacity: 1 }}
               viewport={{ once: true }}
               transition={{ duration: 0.6, delay: 0.6 }}
             >
-              <p className="text-green-200/60 text-sm">
-                © 2024 KrishiSethu. All rights reserved. | Revolutionizing Agricultural Inventory Management
+              <p className="text-gray-500 text-sm">
+                2024 KrishiSethu. All rights reserved. | Revolutionizing Agricultural Inventory Management
               </p>
             </motion.div>
           </div>
         </div>
         
-        {/* Decorative elements */}
-        <div className="absolute top-8 left-8 w-20 h-20 bg-gradient-to-br from-green-400/10 to-emerald-400/10 rounded-full blur-xl"></div>
-        <div className="absolute bottom-8 right-8 w-24 h-24 bg-gradient-to-br from-emerald-400/10 to-green-400/10 rounded-full blur-xl"></div>
+        <div className="absolute top-8 left-8 w-20 h-20 bg-gradient-to-br from-green-600/10 to-emerald-600/10 rounded-full blur-xl"></div>
+        <div className="absolute bottom-8 right-8 w-24 h-24 bg-gradient-to-br from-emerald-600/10 to-green-600/10 rounded-full blur-xl"></div>
       </footer>
     </div>
   );

@@ -70,7 +70,53 @@ export function ProductsPage() {
   const [expiryFilter, setExpiryFilter] = useState('all');
   const [brandFilter, setBrandFilter] = useState('all');
   const [brands, setBrands] = useState<string[]>([]);
-  const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([null, null]);
+
+  // Filter products based on search and filters
+  const filteredProducts = products.filter(product => {
+    const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         product.sku?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         product.brand?.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const matchesCategory = selectedCategory === 'all' || product.category_id === selectedCategory;
+    
+    const matchesStatus = statusFilter === 'all' || product.status === statusFilter;
+    
+    const matchesStock = (() => {
+      if (stockFilter === 'all') return true;
+      if (stockFilter === 'low-stock') return product.current_stock <= (product.minimum_stock || 0);
+      if (stockFilter === 'out-of-stock') return product.current_stock <= 0;
+      return true;
+    })();
+    
+    const matchesPrice = (product.sale_price || 0) >= priceRange[0] && (product.sale_price || 0) <= priceRange[1];
+    
+    const matchesBrand = brandFilter === 'all' || product.brand === brandFilter;
+    
+    const matchesExpiry = (() => {
+      if (expiryFilter === 'all') return true;
+      if (!product.expiry_date) return expiryFilter === 'no-expiry';
+      
+      const today = new Date();
+      const expiry = new Date(product.expiry_date);
+      const daysUntilExpiry = Math.ceil((expiry.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+      
+      if (expiryFilter === 'expired') return daysUntilExpiry < 0;
+      if (expiryFilter === 'expiring-soon') return daysUntilExpiry >= 0 && daysUntilExpiry <= 30;
+      if (expiryFilter === 'valid') return daysUntilExpiry > 30;
+      if (expiryFilter === 'no-expiry') return false;
+      return true;
+    })();
+    
+    const matchesDate = (() => {
+      if (!dateRange[0] && !dateRange[1]) return true;
+      const productDate = new Date(product.created_at);
+      if (dateRange[0] && productDate < dateRange[0]) return false;
+      if (dateRange[1] && productDate > dateRange[1]) return false;
+      return true;
+    })();
+
+    return matchesSearch && matchesCategory && matchesStatus && matchesStock && matchesPrice && matchesBrand && matchesExpiry && matchesDate;
+  });
 
   const getExpiryStatus = (expiryDate: string | null) => {
     if (!expiryDate) return null;
@@ -246,39 +292,14 @@ export function ProductsPage() {
       setProducts(products.map(p => 
         selectedProducts.includes(p.id) ? { ...p, status } : p
       ));
-      if (stockFilter === 'out-of-stock') return product.current_stock <= 0;
-      return true;
-    })();
-    
-    const matchesPrice = (product.sale_price || 0) >= priceRange[0] && (product.sale_price || 0) <= priceRange[1];
-    
-    const matchesBrand = brandFilter === 'all' || product.brand === brandFilter;
-    
-    const matchesExpiry = (() => {
-      if (expiryFilter === 'all') return true;
-      if (!product.expiry_date) return expiryFilter === 'no-expiry';
-      
-      const today = new Date();
-      const expiry = new Date(product.expiry_date);
-      const daysUntilExpiry = Math.ceil((expiry.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-      
-      if (expiryFilter === 'expired') return daysUntilExpiry < 0;
-      if (expiryFilter === 'expiring-soon') return daysUntilExpiry >= 0 && daysUntilExpiry <= 30;
-      if (expiryFilter === 'valid') return daysUntilExpiry > 30;
-      if (expiryFilter === 'no-expiry') return false;
-      return true;
-    })();
-    
-    const matchesDate = (() => {
-      if (!dateRange[0] && !dateRange[1]) return true;
-      const productDate = new Date(product.created_at);
-      if (dateRange[0] && productDate < dateRange[0]) return false;
-      if (dateRange[1] && productDate > dateRange[1]) return false;
-      return true;
-    })();
-
-    return matchesSearch && matchesCategory && matchesStatus && matchesStock && matchesPrice && matchesBrand && matchesExpiry && matchesDate;
-  });
+      setSelectedProducts([]);
+      toast.success(`${selectedProducts.length} products updated successfully`);
+    } catch (error) {
+      toast.error('Failed to update products');
+    } finally {
+      setBulkOperating(false);
+    }
+  };
 
   const getProductImageUrl = (product: Product) => {
     if (!product.image_path) return null;
@@ -348,7 +369,7 @@ export function ProductsPage() {
               p.packing_details || '',
               p.importing_company || ''
             ]);
-            const csv = [header, ...lines].map(a => a.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
+            const csv = [header, ...lines].map((a: any[]) => a.map((v: any) => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
             const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
             const url = URL.createObjectURL(blob);
             const link = document.createElement('a');
@@ -582,7 +603,7 @@ export function ProductsPage() {
           <TableBody>
             {filteredProducts.map((product) => {
               const stockStatus = getStockStatus(product);
-              const expiryStatus = getExpiryStatus(product.expiry_date);
+              const expiryStatus = getExpiryStatus(product.expiry_date || null);
               const imageUrl = getProductImageUrl(product);
               return (
                 <TableRow key={product.id} hover>

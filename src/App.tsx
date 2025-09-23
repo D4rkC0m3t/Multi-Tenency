@@ -22,7 +22,7 @@ import { StockTakePage } from './components/inventory/StockTakePage';
 import { BatchManagementPage } from './components/inventory/BatchManagementPage';
 import { ReorderAlertsPage } from './components/inventory/ReorderAlertsPage';
 import { EInvoicePage } from './components/einvoice/EInvoicePage';
-import LandingPage from './components/landing/LandingPage';
+import LandingPage from './components/landing/LandingPageNew';
 import { ResetPasswordPage } from './components/auth/ResetPasswordPage';
 
 
