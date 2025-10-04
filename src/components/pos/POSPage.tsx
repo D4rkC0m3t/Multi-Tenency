@@ -3,12 +3,14 @@ import {
   Box, Typography, Grid, Card, CardContent, CardMedia, Button, TextField, 
   Paper, IconButton, Divider, Dialog, DialogTitle, DialogContent, 
   DialogActions, FormControl, InputLabel, Select, MenuItem, Chip,
-  Stack, CircularProgress, Alert, DialogContentText, List, ListItem, ListItemText
+  Stack, CircularProgress, Alert, DialogContentText, List, ListItem, ListItemText,
+  Badge
 } from '@mui/material';
+import './POSPage.css';
 import { 
   Add as AddIcon, Remove as RemoveIcon, Delete as DeleteIcon,
   Inventory as StockIcon, Pause as PauseIcon, Print as PrintIcon,
-  Payment as PaymentIcon
+  Payment as PaymentIcon, Search as SearchIcon, ShoppingCart as CartIcon
 } from '@mui/icons-material';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
@@ -142,6 +144,12 @@ const POSPage = () => {
       const existingItem = cart.find(item => item.product.id === product.id);
       
       if (existingItem) {
+        // Check if adding one more would exceed available stock
+        if (existingItem.quantity >= product.current_stock) {
+          toast.error(`Insufficient stock for ${product.name}. Available: ${product.current_stock} ${product.unit}`);
+          return;
+        }
+        
         setCart(prevCart =>
           prevCart.map(item =>
             item.product.id === product.id
@@ -150,8 +158,16 @@ const POSPage = () => {
           )
         );
       } else {
+        // Check if product has stock available
+        if (product.current_stock <= 0) {
+          toast.error(`No stock available for ${product.name}`);
+          return;
+        }
+        
         setCart(prevCart => [...prevCart, { product, quantity: 1, paymentStatus: 'unpaid' }]);
       }
+      
+      toast.success(`${product.name} added to cart`);
     }
   };
 
@@ -194,6 +210,14 @@ const POSPage = () => {
       removeFromCart(productId);
       return;
     }
+    
+    // Find the product to check available stock
+    const product = products.find(p => p.id === productId);
+    if (product && newQuantity > product.current_stock) {
+      toast.error(`Insufficient stock for ${product.name}. Available: ${product.current_stock} ${product.unit}`);
+      return;
+    }
+    
     setCart(prevCart =>
       prevCart.map(item =>
         item.product.id === productId
@@ -552,13 +576,21 @@ const POSPage = () => {
 
       console.log('Sale items created successfully');
 
-      // Update product stock
+      // Update product stock with proper validation
       for (const item of cart) {
-        console.log(`Updating stock for product ${item.product.id}: ${item.product.current_stock} - ${item.quantity}`);
+        const newStock = item.product.current_stock - item.quantity;
+        
+        // Validate stock before update
+        if (newStock < 0) {
+          throw new Error(`Insufficient stock for ${item.product.name}. Available: ${item.product.current_stock} ${item.product.unit}, Required: ${item.quantity} ${item.product.unit}`);
+        }
+        
+        console.log(`Updating stock for product ${item.product.id}: ${item.product.current_stock} - ${item.quantity} = ${newStock}`);
+        
         const { error: stockError } = await supabase
           .from('products')
           .update({ 
-            current_stock: item.product.current_stock - item.quantity 
+            current_stock: newStock 
           })
           .eq('id', item.product.id);
 
@@ -917,258 +949,131 @@ const POSPage = () => {
   }
 
   return (
-    <Box sx={{ p: 3, backgroundColor: '#f8fafc', minHeight: '100vh' }}>
-      {/* Header */}
-      <Box sx={{ mb: 4 }}>
-        <Typography variant="h4" sx={{ 
-          fontWeight: 700, 
-          color: '#1e293b',
-          mb: 1
-        }}>
-          Point of Sale
-        </Typography>
-        <Typography variant="body2" color="text.secondary">
-          Manage your sales and inventory efficiently
-        </Typography>
+    <Box className="modern-pos-container">
+      {/* Modern Header */}
+      <Box className="modern-pos-header">
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Box>
+            <Typography variant="h3" className="modern-pos-header h1">
+              🛒 Modern Point of Sale
+            </Typography>
+            <Typography variant="subtitle1" className="modern-pos-header p">
+              Smart inventory management for {merchant?.name || 'Your Business'}
+            </Typography>
+          </Box>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Badge badgeContent={cart.length} color="error">
+              <IconButton 
+                onClick={() => setShowCheckoutDialog(true)}
+                sx={{ 
+                  color: 'white',
+                  backgroundColor: 'rgba(255,255,255,0.2)',
+                  '&:hover': { backgroundColor: 'rgba(255,255,255,0.3)' }
+                }}
+              >
+                <PaymentIcon />
+              </IconButton>
+            </Badge>
+          </Box>
+        </Box>
       </Box>
 
       <Grid container spacing={3}>
         {/* Products Section */}
         <Grid item xs={12} md={8}>
-          <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid #e2e8f0' }}>
-            {/* Search and Filters */}
-            <Box sx={{ mb: 3 }}>
-              <Box sx={{ display: 'flex', gap: 1, mb: 2, position: 'relative' }} className="customer-search-container">
-                <Box sx={{ position: 'relative', width: '100%' }}>
-                  <TextField
-                    fullWidth
-                    label={enableEnhancedSearch 
-                      ? `Search Customer ${customerSearchField !== 'all' ? `by ${customerSearchField}` : ''}`
-                      : 'Search Customer'}
-                    variant="outlined"
-                    size="small"
-                    value={customerSearchQuery}
-                    onChange={(e) => {
-                      setCustomerSearchQuery(e.target.value);
-                      setShowCustomerDropdown(true);
-                    }}
-                    onFocus={() => {
-                      setShowCustomerDropdown(true);
-                      if (!customerSearchQuery) {
-                        setFilteredCustomers(customers); // Show all customers when no search query
-                      }
-                    }}
-                    onClick={() => setShowCustomerDropdown(true)}
-                    placeholder="Type to search customers or click to see all"
-                  />
-                  {showCustomerDropdown && (
-                    <Paper 
-                      sx={{
-                        position: 'absolute',
-                        top: '100%',
-                        left: 0,
-                        right: 0,
-                        maxHeight: 300,
-                        overflow: 'auto',
-                        zIndex: 1300,
-                        mt: 0.5,
-                        border: '1px solid #e2e8f0',
-                        borderRadius: 1,
-                        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
-                        backgroundColor: 'white'
-                      }}
-                    >
-                      {filteredCustomers.length > 0 ? (
-                        <List sx={{ py: 0 }}>
-                          {filteredCustomers.slice(0, 10).map((customer) => (
-                            <ListItem 
-                              key={customer.id} 
-                              button 
-                              onClick={() => handleCustomerSelect(customer)}
-                              sx={{ 
-                                py: 1,
-                                '&:hover': { 
-                                  backgroundColor: '#f8fafc' 
-                                }
-                              }}
-                            >
-                              <ListItemText 
-                                primary={
-                                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                    {customer.name}
-                                  </Typography>
-                                }
-                                secondary={
-                                  <Typography variant="caption" color="text.secondary">
-                                    {customer.phone} {customer.village ? `• ${customer.village}` : ''}
-                                    {customer.gstin ? ` • GST: ${customer.gstin}` : ''}
-                                  </Typography>
-                                } 
-                              />
-                            </ListItem>
-                          ))}
-                          {filteredCustomers.length > 10 && (
-                            <Box sx={{ p: 1, textAlign: 'center', color: 'text.secondary', fontSize: '0.75rem' }}>
-                              Showing first 10 results. Type to narrow down search.
-                            </Box>
-                          )}
-                        </List>
-                      ) : customerSearchQuery ? (
-                        <Box sx={{ p: 2, color: 'text.secondary', textAlign: 'center' }}>
-                          <Typography variant="body2">No customers found matching "{customerSearchQuery}"</Typography>
-                          <Typography variant="caption">Try searching by name, phone, or village</Typography>
-                        </Box>
-                      ) : (
-                        <Box sx={{ p: 2, color: 'text.secondary', textAlign: 'center' }}>
-                          <Typography variant="body2">Start typing to search customers</Typography>
-                        </Box>
-                      )}
-                    </Paper>
-                  )}
-                </Box>
-                {enableEnhancedSearch && (
-                  <Button 
-                    variant="outlined" 
-                    onClick={() => setShowAdvancedSearch(!showAdvancedSearch)}
-                    size="small"
-                  >
-                    {showAdvancedSearch ? 'Hide Filters' : 'Filters'}
-                  </Button>
-                )}
-              </Box>
-              
-              {showAdvancedSearch && (
-                <Box sx={{ mb: 2, p: 2, border: '1px solid #eee', borderRadius: 1 }}>
-                  <Typography variant="subtitle2" gutterBottom>Search By:</Typography>
-                  <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                    <Chip 
-                      label="All Fields" 
-                      onClick={() => setCustomerSearchField('all')} 
-                      color={customerSearchField === 'all' ? 'primary' : 'default'}
-                      size="small"
-                    />
-                    <Chip 
-                      label="Name" 
-                      onClick={() => setCustomerSearchField('name')} 
-                      color={customerSearchField === 'name' ? 'primary' : 'default'}
-                      size="small"
-                    />
-                    <Chip 
-                      label="Phone" 
-                      onClick={() => setCustomerSearchField('phone')} 
-                      color={customerSearchField === 'phone' ? 'primary' : 'default'}
-                      size="small"
-                    />
-                    <Chip 
-                      label="GSTIN" 
-                      onClick={() => setCustomerSearchField('gstin')} 
-                      color={customerSearchField === 'gstin' ? 'primary' : 'default'}
-                      size="small"
-                    />
-                    <Chip 
-                      label="Village" 
-                      onClick={() => setCustomerSearchField('village')} 
-                      color={customerSearchField === 'village' ? 'primary' : 'default'}
-                      size="small"
-                    />
-                  </Box>
-                  <Typography variant="caption" color="textSecondary" sx={{ mt: 1, display: 'block' }}>
-                    Current filter: {customerSearchField === 'all' ? 'All Fields' : customerSearchField}
-                  </Typography>
-                </Box>
-              )}
+          <Box className="modern-search-section">
+            {/* Modern Search and Filters */}
+            <Box className="modern-search-header">
+              <SearchIcon />
+              <Typography variant="h6" className="modern-search-header h3">
+                Product Search & Filters
+              </Typography>
+            </Box>
+            
+            {/* Customer Search Input */}
+            <Box sx={{ mb: 2 }}>
               <TextField
                 fullWidth
-                placeholder="🔍 Search products by name, SKU, or category..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                sx={{ 
-                  mb: 2,
+                placeholder="Search Customer"
+                value={customerSearchQuery}
+                onChange={(e) => setCustomerSearchQuery(e.target.value)}
+                size="small"
+                sx={{
                   '& .MuiOutlinedInput-root': {
-                    borderRadius: 3,
-                    backgroundColor: '#f8fafc',
-                    fontSize: '0.95rem',
-                    '&:hover': {
-                      backgroundColor: '#f1f5f9'
+                    borderRadius: 2,
+                    backgroundColor: '#ffffff',
+                    '& fieldset': {
+                      borderColor: '#e2e8f0'
                     },
-                    '&.Mui-focused': {
-                      backgroundColor: '#ffffff',
-                      boxShadow: '0 0 0 3px rgba(59, 130, 246, 0.1)'
+                    '&:hover fieldset': {
+                      borderColor: '#3b82f6'
                     }
                   }
                 }}
               />
-              
-              {/* Filter Row */}
-              <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
-                <FormControl size="small" sx={{ minWidth: 120 }}>
-                  <InputLabel>Category</InputLabel>
-                  <Select
-                    value={categoryFilter}
-                    onChange={(e) => setCategoryFilter(e.target.value)}
-                    label="Category"
-                    sx={{
-                      borderRadius: 2,
-                      backgroundColor: '#f8fafc',
-                      '& .MuiOutlinedInput-notchedOutline': {
-                        borderColor: '#e2e8f0'
-                      }
-                    }}
-                  >
-                    <MenuItem value="">All Categories</MenuItem>
-                    {[...new Set(products.map(p => p.category?.name).filter(Boolean))].map((category) => (
-                      <MenuItem key={category} value={category}>{category}</MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-                
-                <FormControl size="small" sx={{ minWidth: 120 }}>
-                  <InputLabel>Stock</InputLabel>
-                  <Select
-                    value={stockFilter}
-                    onChange={(e) => setStockFilter(e.target.value)}
-                    label="Stock"
-                    sx={{
-                      borderRadius: 2,
-                      backgroundColor: '#f8fafc',
-                      '& .MuiOutlinedInput-notchedOutline': {
-                        borderColor: '#e2e8f0'
-                      }
-                    }}
-                  >
-                    <MenuItem value="all">All Stock</MenuItem>
-                    <MenuItem value="in_stock">✅ In Stock</MenuItem>
-                    <MenuItem value="low_stock">⚠️ Low Stock</MenuItem>
-                    <MenuItem value="out_of_stock">❌ Out of Stock</MenuItem>
-                  </Select>
-                </FormControl>
-                
-                <FormControl size="small" sx={{ minWidth: 140 }}>
-                  <InputLabel>Sort By</InputLabel>
-                  <Select
-                    value={sortBy}
-                    onChange={(e) => setSortBy(e.target.value)}
-                    label="Sort By"
-                    sx={{
-                      borderRadius: 2,
-                      backgroundColor: '#f8fafc',
-                      '& .MuiOutlinedInput-notchedOutline': {
-                        borderColor: '#e2e8f0'
-                      }
-                    }}
-                  >
-                    <MenuItem value="name">Name A→Z</MenuItem>
-                    <MenuItem value="price_low">Price Low→High</MenuItem>
-                    <MenuItem value="price_high">Price High→Low</MenuItem>
-                    <MenuItem value="stock">Stock High→Low</MenuItem>
-                  </Select>
-                </FormControl>
-                
-                <Typography variant="body2" sx={{ color: '#64748b', ml: 'auto' }}>
-                  {filteredProducts.length} products found
-                </Typography>
-              </Box>
             </Box>
+            
+            {/* Product Search Input */}
+            <TextField
+              fullWidth
+              placeholder="🔍 Search products by name, SKU, or category..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="modern-search-input"
+              sx={{ mb: 2 }}
+            />
+            
+            {/* Modern Filter Row */}
+            <Box className="modern-filters-row">
+              <FormControl size="small" className="modern-filter-select" sx={{ minWidth: 150 }}>
+                <InputLabel>Stock</InputLabel>
+                <Select
+                  value={stockFilter}
+                  onChange={(e) => setStockFilter(e.target.value)}
+                  label="Stock"
+                  sx={{
+                    borderRadius: 2,
+                    backgroundColor: '#f8fafc',
+                    '& .MuiOutlinedInput-notchedOutline': {
+                      borderColor: '#e2e8f0'
+                    }
+                  }}
+                >
+                  <MenuItem value="all">All Stock</MenuItem>
+                  <MenuItem value="in_stock">✅ In Stock</MenuItem>
+                  <MenuItem value="low_stock">⚠️ Low Stock</MenuItem>
+                  <MenuItem value="out_of_stock">❌ Out of Stock</MenuItem>
+                </Select>
+              </FormControl>
+              
+              <FormControl size="small" sx={{ minWidth: 160 }}>
+                <InputLabel>Sort By</InputLabel>
+                <Select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value)}
+                  label="Sort By"
+                  sx={{
+                    borderRadius: 2,
+                    backgroundColor: '#f8fafc',
+                    '& .MuiOutlinedInput-notchedOutline': {
+                      borderColor: '#e2e8f0'
+                    }
+                  }}
+                >
+                  <MenuItem value="name">Name A→Z</MenuItem>
+                  <MenuItem value="price_low">Price Low→High</MenuItem>
+                  <MenuItem value="price_high">Price High→Low</MenuItem>
+                  <MenuItem value="stock">Stock High→Low</MenuItem>
+                </Select>
+              </FormControl>
+              
+              <Chip 
+                label={`${filteredProducts.length} products`}
+                className="modern-products-count"
+                sx={{ ml: 'auto' }}
+              />
+            </Box>
+          </Box>
           
             <Grid container spacing={2} sx={{ alignItems: 'stretch' }}>
               {filteredProducts.map((product) => {
@@ -1462,7 +1367,6 @@ const POSPage = () => {
               );
             })}
           </Grid>
-        </Paper>
       </Grid>
 
         {/* Cart Section */}
@@ -1474,18 +1378,170 @@ const POSPage = () => {
               </Typography>
               <Chip 
                 label={`${cart.length} items`} 
-                sx={{ 
-                  backgroundColor: '#dbeafe', 
-                  color: '#1d4ed8',
-                  fontWeight: 600
-                }}
+                className="modern-cart-item-count"
               />
             </Box>
             
-            {/* Customer Selection */}
+            {/* Customer Selection with Search */}
             <Box sx={{ mb: 3 }}>
               <Typography variant="body2" sx={{ mb: 1, fontWeight: 600, color: '#374151' }}>👤 Customer</Typography>
-              <FormControl fullWidth>
+              
+              {/* Customer Search Field */}
+              <Box sx={{ display: 'flex', gap: 1, mb: 1, position: 'relative' }} className="customer-search-container">
+                <Box sx={{ position: 'relative', width: '100%' }}>
+                  <TextField
+                    fullWidth
+                    label={enableEnhancedSearch 
+                      ? `Search Customer ${customerSearchField !== 'all' ? `by ${customerSearchField}` : ''}`
+                      : 'Search Customer'}
+                    variant="outlined"
+                    size="small"
+                    value={customerSearchQuery}
+                    onChange={(e) => {
+                      setCustomerSearchQuery(e.target.value);
+                      setShowCustomerDropdown(true);
+                    }}
+                    onFocus={() => {
+                      setShowCustomerDropdown(true);
+                      if (!customerSearchQuery) {
+                        setFilteredCustomers(customers);
+                      }
+                    }}
+                    onClick={() => setShowCustomerDropdown(true)}
+                    placeholder="Type to search or click to see all"
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: 2,
+                        backgroundColor: '#f8fafc',
+                        '& fieldset': {
+                          borderColor: '#e2e8f0'
+                        },
+                        '&:hover fieldset': {
+                          borderColor: '#3b82f6'
+                        }
+                      }
+                    }}
+                  />
+                  {showCustomerDropdown && (
+                    <Paper 
+                      sx={{
+                        position: 'absolute',
+                        top: '100%',
+                        left: 0,
+                        right: 0,
+                        maxHeight: 300,
+                        overflow: 'auto',
+                        zIndex: 1300,
+                        mt: 0.5,
+                        border: '1px solid #e2e8f0',
+                        borderRadius: 1,
+                        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                        backgroundColor: 'white'
+                      }}
+                    >
+                      {filteredCustomers.length > 0 ? (
+                        <List sx={{ py: 0 }}>
+                          {filteredCustomers.slice(0, 10).map((customer) => (
+                            <ListItem 
+                              key={customer.id} 
+                              button 
+                              onClick={() => handleCustomerSelect(customer)}
+                              sx={{ 
+                                py: 1,
+                                '&:hover': { 
+                                  backgroundColor: '#f8fafc' 
+                                }
+                              }}
+                            >
+                              <ListItemText 
+                                primary={
+                                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                    {customer.name}
+                                  </Typography>
+                                }
+                                secondary={
+                                  <Typography variant="caption" color="text.secondary">
+                                    {customer.phone} {customer.village ? `• ${customer.village}` : ''}
+                                    {customer.gstin ? ` • GST: ${customer.gstin}` : ''}
+                                  </Typography>
+                                } 
+                              />
+                            </ListItem>
+                          ))}
+                          {filteredCustomers.length > 10 && (
+                            <Box sx={{ p: 1, textAlign: 'center', color: 'text.secondary', fontSize: '0.75rem' }}>
+                              Showing first 10 results. Type to narrow down search.
+                            </Box>
+                          )}
+                        </List>
+                      ) : customerSearchQuery ? (
+                        <Box sx={{ p: 2, color: 'text.secondary', textAlign: 'center' }}>
+                          <Typography variant="body2">No customers found matching "{customerSearchQuery}"</Typography>
+                          <Typography variant="caption">Try searching by name, phone, or village</Typography>
+                        </Box>
+                      ) : (
+                        <Box sx={{ p: 2, color: 'text.secondary', textAlign: 'center' }}>
+                          <Typography variant="body2">Start typing to search customers</Typography>
+                        </Box>
+                      )}
+                    </Paper>
+                  )}
+                </Box>
+                {enableEnhancedSearch && (
+                  <Button 
+                    variant="outlined" 
+                    onClick={() => setShowAdvancedSearch(!showAdvancedSearch)}
+                    size="small"
+                  >
+                    {showAdvancedSearch ? 'Hide' : 'Filters'}
+                  </Button>
+                )}
+              </Box>
+              
+              {/* Advanced Search Filters */}
+              {showAdvancedSearch && (
+                <Box sx={{ mb: 2, p: 2, border: '1px solid #eee', borderRadius: 1 }}>
+                  <Typography variant="subtitle2" gutterBottom>Search By:</Typography>
+                  <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                    <Chip 
+                      label="All Fields" 
+                      onClick={() => setCustomerSearchField('all')} 
+                      color={customerSearchField === 'all' ? 'primary' : 'default'}
+                      size="small"
+                    />
+                    <Chip 
+                      label="Name" 
+                      onClick={() => setCustomerSearchField('name')} 
+                      color={customerSearchField === 'name' ? 'primary' : 'default'}
+                      size="small"
+                    />
+                    <Chip 
+                      label="Phone" 
+                      onClick={() => setCustomerSearchField('phone')} 
+                      color={customerSearchField === 'phone' ? 'primary' : 'default'}
+                      size="small"
+                    />
+                    <Chip 
+                      label="GSTIN" 
+                      onClick={() => setCustomerSearchField('gstin')} 
+                      color={customerSearchField === 'gstin' ? 'primary' : 'default'}
+                      size="small"
+                    />
+                    <Chip 
+                      label="Village" 
+                      onClick={() => setCustomerSearchField('village')} 
+                      color={customerSearchField === 'village' ? 'primary' : 'default'}
+                      size="small"
+                    />
+                  </Box>
+                  <Typography variant="caption" color="textSecondary" sx={{ mt: 1, display: 'block' }}>
+                    Current filter: {customerSearchField === 'all' ? 'All Fields' : customerSearchField}
+                  </Typography>
+                </Box>
+              )}
+              
+              {/* Or use dropdown for quick selection */}
+              <FormControl fullWidth className="modern-form-control">
                 <Select
                   value={selectedCustomer}
                   onChange={(e) => {
@@ -1565,7 +1621,7 @@ const POSPage = () => {
             {/* GST Rate Selection */}
             <Box sx={{ mb: 3 }}>
               <Typography variant="body2" sx={{ mb: 1, fontWeight: 600, color: '#374151' }}>📊 GST Rate</Typography>
-              <FormControl fullWidth>
+              <FormControl fullWidth className="modern-form-control">
                 <Select
                   value={customGstRate}
                   onChange={(e) => setCustomGstRate(Number(e.target.value))}
@@ -1633,10 +1689,10 @@ const POSPage = () => {
             </Box>
             
             {cart.length === 0 ? (
-              <Box sx={{ textAlign: 'center', py: 4 }}>
-                <Typography variant="h6" color="text.secondary" sx={{ mb: 1 }}>🛒</Typography>
-                <Typography color="text.secondary">Your cart is empty</Typography>
-                <Typography variant="caption" color="text.secondary">Add products to get started</Typography>
+              <Box className="modern-cart-empty">
+                <Typography variant="h6" sx={{ mb: 1 }}>🛒</Typography>
+                <Typography className="modern-cart-empty-text">Your cart is empty</Typography>
+                <Typography className="modern-cart-empty-subtext">Add products to get started</Typography>
               </Box>
             ) : (
               <>
@@ -2236,6 +2292,14 @@ const POSPage = () => {
           onConfirm={handleBatchSelection}
         />
       )}
+
+      {/* Modern Floating Cart Button */}
+      <button 
+        className="modern-floating-cart-button"
+        onClick={() => setShowCheckoutDialog(true)}
+      >
+        <CartIcon />
+      </button>
     </Box>
   );
 };
