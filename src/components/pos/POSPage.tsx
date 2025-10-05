@@ -340,21 +340,59 @@ const POSPage = () => {
   // Helper function to get UOM display
   const getUOMDisplay = (product: Product) => {
     const packSize = (product as any).pack_size || 50;
-    const unit = product.unit || 'kg';
+    const unit = product.unit?.toLowerCase() || 'kg';
     const stock = product.current_stock || 0;
     
-    if (unit === 'kg') {
+    // Handle KG units
+    if (unit === 'kg' || unit === 'kilogram') {
       const bags = Math.floor(stock / packSize);
       const remaining = stock % packSize;
+      
+      if (stock === 0) {
+        return {
+          primary: 'Out of Stock',
+          secondary: '0 kg available'
+        };
+      }
+      
       const primaryText = `${bags} Bags${remaining > 0 ? ` + ${remaining}kg` : ''}`;
       return {
         primary: primaryText.length > 20 ? `${bags} Bags` : primaryText,
         secondary: `(${stock} kg total)`
       };
-    } else if (unit === 'litre' || unit === 'L') {
+    } 
+    // Handle Litre/ML units
+    else if (unit === 'litre' || unit === 'l' || unit === 'liter') {
+      if (stock === 0) {
+        return {
+          primary: 'Out of Stock',
+          secondary: '0 L available'
+        };
+      }
       return {
         primary: `${Math.floor(stock)} Bottles`,
         secondary: `(${stock}L total)`
+      };
+    } 
+    else if (unit === 'ml' || unit === 'millilitre') {
+      if (stock === 0) {
+        return {
+          primary: 'Out of Stock',
+          secondary: '0 ML available'
+        };
+      }
+      const bottles = Math.floor(stock / 1000); // Assuming 1L bottles
+      const remainingML = stock % 1000;
+      return {
+        primary: bottles > 0 ? `${bottles} Bottles${remainingML > 0 ? ` + ${remainingML}ml` : ''}` : `${stock} ml`,
+        secondary: `(${stock} ml total)`
+      };
+    }
+    // Default for other units
+    if (stock === 0) {
+      return {
+        primary: 'Out of Stock',
+        secondary: `0 ${unit} available`
       };
     }
     return {
@@ -1078,7 +1116,10 @@ const POSPage = () => {
             <Grid container spacing={2} sx={{ alignItems: 'stretch' }}>
               {filteredProducts.map((product) => {
                 const stockDisplay = getUOMDisplay(product);
-                const isLowStock = (product.current_stock || 0) <= (product.minimum_stock || 0);
+                const currentStock = product.current_stock || 0;
+                const minimumStock = product.minimum_stock || 0;
+                const isOutOfStock = currentStock === 0;
+                const isLowStock = currentStock > 0 && currentStock <= minimumStock;
                 return (
                   <Grid item xs={6} sm={4} md={3} lg={2.4} key={product.id} sx={{ display: 'flex' }}>
                     <Card sx={{ 
@@ -1090,31 +1131,34 @@ const POSPage = () => {
                       borderRadius: 3,
                       border: '1px solid #e2e8f0',
                       boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-                      transition: 'all 0.2s ease-in-out',
+                      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                       position: 'relative',
                       overflow: 'hidden',
                       flex: 1,
                       backgroundColor: '#ffffff',
                       '&:hover': {
-                        boxShadow: '0 8px 25px rgba(0,0,0,0.1)',
-                        transform: 'translateY(-2px)',
+                        boxShadow: '0 12px 32px rgba(0,0,0,0.12)',
+                        transform: 'translateY(-4px)',
                         borderColor: '#3b82f6'
                       }
                     }}>
                       {/* Stock Status Badge */}
-                      {isLowStock && (
+                      {(isOutOfStock || isLowStock) && (
                         <Chip 
-                          label="Low Stock" 
+                          label={isOutOfStock ? 'Out of Stock' : 'Low Stock'} 
                           size="small" 
                           sx={{ 
                             position: 'absolute', 
-                            top: 8, 
-                            right: 8, 
-                            zIndex: 1,
-                            backgroundColor: '#fef3c7',
-                            color: '#92400e',
+                            top: 12, 
+                            right: 12, 
+                            zIndex: 2,
+                            backgroundColor: isOutOfStock ? '#fee2e2' : '#fef3c7',
+                            color: isOutOfStock ? '#991b1b' : '#92400e',
                             fontSize: '0.7rem',
-                            height: '20px'
+                            height: '22px',
+                            fontWeight: 600,
+                            px: 1.5,
+                            boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
                           }} 
                         />
                       )}
@@ -1150,8 +1194,8 @@ const POSPage = () => {
                         />
                     </Box>
                       <CardContent sx={{ 
-                        p: 2,
-                        '&:last-child': { pb: 2 },
+                        p: 2.5,
+                        '&:last-child': { pb: 2.5 },
                         display: 'flex',
                         flexDirection: 'column',
                         height: '180px',
@@ -1162,37 +1206,42 @@ const POSPage = () => {
                       }}>
                       <Box sx={{ flex: 1, overflow: 'hidden' }}>
                         <Typography variant="body2" fontWeight="600" sx={{ 
-                          fontSize: '0.85rem',
-                          lineHeight: 1.3,
-                          height: '36px',
-                          minHeight: '36px',
+                          fontSize: '0.9rem',
+                          lineHeight: 1.4,
+                          height: '38px',
+                          minHeight: '38px',
                           overflow: 'hidden',
                           display: '-webkit-box',
                           WebkitLineClamp: 2,
                           WebkitBoxOrient: 'vertical',
                           mb: 1,
-                          color: '#1e293b'
+                          color: '#0f172a'
                         }}>
                           {product.name}
                         </Typography>
                         
                         <Typography variant="caption" sx={{ 
-                          fontSize: '0.7rem',
+                          fontSize: '0.65rem',
                           display: 'block',
-                          mb: 1,
-                          height: '18px',
-                          minHeight: '18px',
+                          mb: 1.5,
+                          height: '16px',
+                          minHeight: '16px',
                           overflow: 'hidden',
                           textOverflow: 'ellipsis',
                           whiteSpace: 'nowrap',
-                          color: '#64748b',
-                          fontWeight: 500
+                          color: '#94a3b8',
+                          fontWeight: 400
                         }}>
                           SKU: {product.sku || 'N/A'}
                         </Typography>
                         
                         <Box display="flex" alignItems="center" sx={{ mb: 1, height: '22px' }}>
-                          <StockIcon sx={{ fontSize: 14, mr: 0.5, color: isLowStock ? '#dc2626' : '#10b981', flexShrink: 0 }} />
+                          <StockIcon sx={{ 
+                            fontSize: 14, 
+                            mr: 0.5, 
+                            color: isOutOfStock ? '#dc2626' : isLowStock ? '#f59e0b' : '#10b981', 
+                            flexShrink: 0 
+                          }} />
                           <Typography variant="caption" sx={{ 
                             fontSize: '0.7rem',
                             fontWeight: 600,
@@ -1203,7 +1252,7 @@ const POSPage = () => {
                             textOverflow: 'ellipsis',
                             whiteSpace: 'nowrap',
                             flex: 1,
-                            color: isLowStock ? '#dc2626' : '#10b981'
+                            color: isOutOfStock ? '#dc2626' : isLowStock ? '#f59e0b' : '#10b981'
                           }}>
                             {stockDisplay.primary}
                           </Typography>
@@ -1222,30 +1271,31 @@ const POSPage = () => {
                           {stockDisplay.secondary}
                         </Typography>
 
-                        <Box display="flex" justifyContent="space-between" alignItems="center" sx={{ mb: 1, height: '28px', minHeight: '28px' }}>
+                        <Box display="flex" justifyContent="space-between" alignItems="center" sx={{ mb: 1.5, height: '30px', minHeight: '30px' }}>
                           <Typography variant="h6" sx={{ 
-                            fontSize: '1.1rem',
+                            fontSize: '1.15rem',
                             fontWeight: 700,
                             flexShrink: 0,
                             color: '#059669'
                           }}>
-                            ₹{product.sale_price || 0}
+                            ₹{product.sale_price?.toLocaleString('en-IN') || 0}
                           </Typography>
                           <Chip 
                             label={product.category?.name || 'General'} 
                             size="small"
                             sx={{ 
                               fontSize: '0.65rem', 
-                              height: 20,
+                              height: 22,
                               minWidth: 50,
-                              maxWidth: 80,
+                              maxWidth: 85,
                               backgroundColor: '#dbeafe',
-                              color: '#1d4ed8',
-                              fontWeight: 500,
+                              color: '#1e40af',
+                              fontWeight: 600,
                               '& .MuiChip-label': {
                                 overflow: 'hidden',
                                 textOverflow: 'ellipsis',
-                                whiteSpace: 'nowrap'
+                                whiteSpace: 'nowrap',
+                                px: 1
                               }
                             }}
                           />
@@ -1275,12 +1325,16 @@ const POSPage = () => {
                               }}
                               sx={{ 
                                 backgroundColor: '#f1f5f9',
-                                width: '28px',
-                                height: '28px',
-                                '&:hover': { backgroundColor: '#e2e8f0' }
+                                width: '30px',
+                                height: '30px',
+                                '&:hover': { 
+                                  backgroundColor: '#e2e8f0',
+                                  transform: 'scale(1.05)'
+                                },
+                                transition: 'all 0.2s'
                               }}
                             >
-                              <RemoveIcon sx={{ fontSize: 14 }} />
+                              <RemoveIcon sx={{ fontSize: 16 }} />
                             </IconButton>
                             <Typography 
                               sx={{ 
@@ -1305,13 +1359,18 @@ const POSPage = () => {
                                 if (cartItem) updateQuantity(product.id, cartItem.quantity + 1);
                               }}
                               sx={{ 
-                                backgroundColor: '#f1f5f9',
-                                width: '28px',
-                                height: '28px',
-                                '&:hover': { backgroundColor: '#e2e8f0' }
+                                backgroundColor: '#3b82f6',
+                                color: 'white',
+                                width: '30px',
+                                height: '30px',
+                                '&:hover': { 
+                                  backgroundColor: '#2563eb',
+                                  transform: 'scale(1.05)'
+                                },
+                                transition: 'all 0.2s'
                               }}
                             >
-                              <AddIcon sx={{ fontSize: 14 }} />
+                              <AddIcon sx={{ fontSize: 16 }} />
                             </IconButton>
                             <IconButton 
                               size="small" 
@@ -1330,35 +1389,32 @@ const POSPage = () => {
                           </Box>
                         ) : (
                           <Button
-                            variant="contained"
                             fullWidth
-                            size="small"
-                            sx={{ 
-                              fontSize: '0.75rem', 
-                              py: 1, 
+                            variant="contained"
+                            onClick={() => addToCart(product)}
+                            disabled={isOutOfStock}
+                            startIcon={<AddIcon />}
+                            sx={{
+                              backgroundColor: isOutOfStock ? '#9ca3af' : '#059669',
+                              color: 'white',
                               height: '36px',
-                              minHeight: '36px',
-                              maxHeight: '36px',
-                              borderRadius: 2,
+                              fontSize: '0.85rem',
+                              fontWeight: 700,
                               textTransform: 'none',
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              whiteSpace: 'nowrap',
-                              flexShrink: 0,
-                              fontWeight: 600,
-                              backgroundColor: product.current_stock <= 0 ? '#94a3b8' : '#059669',
+                              borderRadius: 2,
                               '&:hover': {
-                                backgroundColor: product.current_stock <= 0 ? '#94a3b8' : '#047857'
+                                backgroundColor: isOutOfStock ? '#9ca3af' : '#047857',
+                                transform: isOutOfStock ? 'none' : 'scale(1.02)'
                               },
                               '&:disabled': {
-                                backgroundColor: '#94a3b8',
-                                color: '#ffffff'
-                              }
+                                backgroundColor: '#9ca3af',
+                                color: 'white',
+                                opacity: 0.7
+                              },
+                              transition: 'all 0.2s'
                             }}
-                            onClick={() => addToCart(product)}
-                            disabled={product.current_stock <= 0}
                           >
-                            {product.current_stock <= 0 ? '🚫 Out of Stock' : `₹${product.sale_price || 0}`}
+                            {isOutOfStock ? 'Out of Stock' : `₹${product.sale_price?.toLocaleString('en-IN') || 0}`}
                           </Button>
                         )}
                     </CardContent>
