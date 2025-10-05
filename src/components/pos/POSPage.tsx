@@ -56,7 +56,7 @@ const POSPage = () => {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState('');
+  const [categoryFilter, _setCategoryFilter] = useState('');
   const [stockFilter, setStockFilter] = useState('all');
   const [sortBy, setSortBy] = useState('name');
   const [customerSearchQuery, setCustomerSearchQuery] = useState('');
@@ -190,7 +190,7 @@ const POSPage = () => {
       return [...prevCart, { 
         product: selectedProductForBatch, 
         quantity: requestedBatchQuantity, 
-        paid: false,
+        paymentStatus: 'unpaid',
         batchSelections: selections
       }];
     });
@@ -224,7 +224,7 @@ const POSPage = () => {
           ? { 
               ...item, 
               quantity: newQuantity,
-              paymentStatus: paid !== undefined ? paid : item.paymentStatus
+              paymentStatus: paid !== undefined ? (paid ? 'paid' : 'unpaid') : item.paymentStatus
             }
           : item
       )
