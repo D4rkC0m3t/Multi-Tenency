@@ -37,6 +37,17 @@ export function SignUpForm({ onBackToLogin }: SignUpFormProps) {
     try {
       setLoading(true);
       await signUp(data.email, data.password, data.fullName);
+      // Show success notification to check email
+      toast.success('Please check your email inbox for authentication link!', {
+        duration: 6000,
+        icon: '📧',
+        style: {
+          background: '#10B981',
+          color: '#fff',
+          padding: '16px',
+          borderRadius: '10px',
+        },
+      });
     } catch (error: any) {
       toast.error(error.message || 'Failed to sign up');
     } finally {

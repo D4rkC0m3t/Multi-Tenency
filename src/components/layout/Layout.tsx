@@ -3,6 +3,7 @@ import { Outlet } from 'react-router-dom';
 import { Box } from '@mui/material';
 import { Sidebar } from './Sidebar';
 import { Navbar } from './Navbar';
+import { SubscriptionBanner } from '../common/SubscriptionBanner';
 
 const drawerWidth = 260;
 const collapsedDrawerWidth = 64;
@@ -30,6 +31,7 @@ export function Layout() {
         }}
       >
         <Navbar />
+        <SubscriptionBanner />
         <Box 
           component="main" 
           sx={{ 

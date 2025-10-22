@@ -43,7 +43,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
 
     // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('Auth event:', event);
+      
+      // Don't fetch profile during password recovery
+      if (event === 'PASSWORD_RECOVERY') {
+        setUser(session?.user ?? null);
+        setLoading(false);
+        return;
+      }
+      
       setUser(session?.user ?? null);
       
       if (session?.user) {
@@ -187,10 +196,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
 
     if (error) {
+      console.error('Password reset error:', error);
       throw error;
     }
 
-    toast.success('Password reset email sent! Check your inbox.');
+    console.log('Password reset email sent successfully to:', email);
+    toast.success('Password reset email sent! Check your inbox (including spam folder).');
   };
 
   const value = {

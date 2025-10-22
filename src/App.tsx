@@ -24,17 +24,43 @@ import { ReorderAlertsPage } from './components/inventory/ReorderAlertsPage';
 import { EInvoicePage } from './components/einvoice/EInvoicePage';
 import LandingPage from './components/landing/LandingPageNew';
 import { ResetPasswordPage } from './components/auth/ResetPasswordPage';
+import { SubscriptionPage } from './components/subscription/SubscriptionPage';
+import { PaymentManagementPage } from './components/admin/PaymentManagementPage';
+import { AdminLoginPage } from './components/admin/AdminLoginPage';
+import { AdminDashboard } from './components/admin/AdminDashboard';
+import TermsAndConditions from './components/legal/TermsAndConditions';
+import PrivacyPolicy from './components/legal/PrivacyPolicy';
+import RefundPolicy from './components/legal/RefundPolicy';
+import { FeatureAccessGuard } from './components/common/FeatureAccessGuard';
+import { NotFoundPage } from './components/common/NotFoundPage';
 
 
 function AppContent() {
   const { user, loading, merchant } = useAuth();
   const defaultTheme = createTheme();
+  const isPasswordRecovery = window.location.pathname === '/reset-password';
 
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
       </div>
+    );
+  }
+
+  // If user is on password recovery page, show it regardless of auth state
+  if (isPasswordRecovery) {
+    return (
+      <ThemeProvider theme={defaultTheme}>
+        <CssBaseline />
+        <div className="app-container">
+          <Routes>
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
+            <Route path="*" element={<Navigate to="/reset-password" replace />} />
+          </Routes>
+          <Toaster position="top-right" />
+        </div>
+      </ThemeProvider>
     );
   }
 
@@ -45,12 +71,15 @@ function AppContent() {
         <CssBaseline />
         <div className="app-container">
           <Routes>
-            <Route path="/" element={<Navigate to="/landing" replace />} />
-            <Route path="/landing" element={<LandingPage />} />
+            <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={<AuthPage />} />
             <Route path="/auth" element={<AuthPage />} />
             <Route path="/reset-password" element={<ResetPasswordPage />} />
-            <Route path="*" element={<Navigate to="/landing" replace />} />
+            <Route path="/admin/login" element={<AdminLoginPage />} />
+            <Route path="/terms" element={<TermsAndConditions />} />
+            <Route path="/privacy" element={<PrivacyPolicy />} />
+            <Route path="/refund" element={<RefundPolicy />} />
+            <Route path="*" element={<NotFoundPage />} />
           </Routes>
           <Toaster position="top-right" />
         </div>
@@ -90,29 +119,38 @@ function AppContent() {
           
           {/* Main App Routes */}
           <Route path="/" element={<Layout />}>
-            <Route index element={<Dashboard />} />
-            <Route path="dashboard" element={<Dashboard />} />
-            <Route path="products" element={<ProductsPage />} />
-            <Route path="categories" element={<CategoriesPage />} />
-            <Route path="customers" element={<CustomersPage />} />
-            <Route path="suppliers" element={<SuppliersPage />} />
-            <Route path="suppliers/payments" element={<SupplierPaymentsPage />} />
-            <Route path="sales" element={<SalesPage />} />
-            <Route path="pos" element={<POSPage />} />
-            <Route path="purchases" element={<PurchasesPage />} />
-            <Route path="purchases/orders" element={<PurchaseOrdersPage />} />
-            <Route path="inventory/movements" element={<StockMovementsPage />} />
-            <Route path="inventory/stock-take" element={<StockTakePage />} />
-            <Route path="inventory/batches" element={<BatchManagementPage />} />
-            <Route path="inventory/reorder-alerts" element={<ReorderAlertsPage />} />
-            <Route path="einvoice" element={<EInvoicePage />} />
-            <Route path="reports" element={<ReportsPage />} />
+            <Route index element={<FeatureAccessGuard feature="Dashboard"><Dashboard /></FeatureAccessGuard>} />
+            <Route path="dashboard" element={<FeatureAccessGuard feature="Dashboard"><Dashboard /></FeatureAccessGuard>} />
+            <Route path="products" element={<FeatureAccessGuard feature="Product Management"><ProductsPage /></FeatureAccessGuard>} />
+            <Route path="categories" element={<FeatureAccessGuard feature="Categories"><CategoriesPage /></FeatureAccessGuard>} />
+            <Route path="customers" element={<FeatureAccessGuard feature="Customer Management"><CustomersPage /></FeatureAccessGuard>} />
+            <Route path="suppliers" element={<FeatureAccessGuard feature="Supplier Management"><SuppliersPage /></FeatureAccessGuard>} />
+            <Route path="suppliers/payments" element={<FeatureAccessGuard feature="Supplier Payments"><SupplierPaymentsPage /></FeatureAccessGuard>} />
+            <Route path="sales" element={<FeatureAccessGuard feature="Sales History"><SalesPage /></FeatureAccessGuard>} />
+            <Route path="pos" element={<FeatureAccessGuard feature="POS System"><POSPage /></FeatureAccessGuard>} />
+            <Route path="purchases" element={<FeatureAccessGuard feature="Purchase Management"><PurchasesPage /></FeatureAccessGuard>} />
+            <Route path="purchases/orders" element={<FeatureAccessGuard feature="Purchase Orders"><PurchaseOrdersPage /></FeatureAccessGuard>} />
+            <Route path="inventory/movements" element={<FeatureAccessGuard feature="Stock Movements"><StockMovementsPage /></FeatureAccessGuard>} />
+            <Route path="inventory/stock-take" element={<FeatureAccessGuard feature="Stock Take"><StockTakePage /></FeatureAccessGuard>} />
+            <Route path="inventory/batches" element={<FeatureAccessGuard feature="Batch Management"><BatchManagementPage /></FeatureAccessGuard>} />
+            <Route path="inventory/reorder-alerts" element={<FeatureAccessGuard feature="Reorder Alerts"><ReorderAlertsPage /></FeatureAccessGuard>} />
+            <Route path="einvoice" element={<FeatureAccessGuard feature="E-Invoice"><EInvoicePage /></FeatureAccessGuard>} />
+            <Route path="reports" element={<FeatureAccessGuard feature="Reports & Analytics"><ReportsPage /></FeatureAccessGuard>} />
             <Route path="notifications" element={<NotificationsPage />} />
             <Route path="settings" element={<SettingsPage />} />
+            <Route path="subscription" element={<SubscriptionPage />} />
+            <Route path="admin/payments" element={<PaymentManagementPage />} />
+            <Route path="terms" element={<TermsAndConditions />} />
+            <Route path="privacy" element={<PrivacyPolicy />} />
+            <Route path="refund" element={<RefundPolicy />} />
           </Route>
+
+          {/* Admin Routes (outside Layout) */}
+          <Route path="/admin/dashboard" element={<AdminDashboard />} />
+          <Route path="/admin/login" element={<AdminLoginPage />} />
           
-          {/* Fallback redirect */}
-          <Route path="*" element={<Navigate to="/" replace />} />
+          {/* 404 Not Found - Catch all unknown routes */}
+          <Route path="*" element={<NotFoundPage />} />
         </Routes>
         <Toaster
           position="top-right"

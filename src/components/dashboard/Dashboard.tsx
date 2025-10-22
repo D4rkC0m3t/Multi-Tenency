@@ -26,6 +26,7 @@ import {
   CalendarToday as CalendarIcon,
   Search as SearchIcon,
   Add as AddIcon,
+  CreditCard as CreditCardIcon,
 } from '@mui/icons-material';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -355,6 +356,24 @@ export function Dashboard() {
           </Typography>
         </Box>
         <Stack direction="row" spacing={2} alignItems="center">
+          <Button
+            variant="contained"
+            color="primary"
+            startIcon={<CreditCardIcon />}
+            onClick={() => navigate('/subscription')}
+            sx={{
+              background: 'linear-gradient(135deg, #16a34a 0%, #059669 100%)',
+              boxShadow: '0 4px 12px rgba(22, 163, 74, 0.3)',
+              '&:hover': {
+                background: 'linear-gradient(135deg, #15803d 0%, #047857 100%)',
+                boxShadow: '0 6px 16px rgba(22, 163, 74, 0.4)',
+              },
+              fontWeight: 600,
+              px: 3,
+            }}
+          >
+            Subscription
+          </Button>
           <TextField 
             size="small" 
             placeholder="Search products, customers, sales..." 

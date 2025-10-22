@@ -34,6 +34,17 @@ export function ForgotPasswordModal({ isOpen, onClose }: ForgotPasswordModalProp
       setLoading(true);
       await resetPassword(data.email);
       setEmailSent(true);
+      // Show success notification to check email
+      toast.success('Please check your email for the password reset link!', {
+        duration: 6000,
+        icon: '📧',
+        style: {
+          background: '#10B981',
+          color: '#fff',
+          padding: '16px',
+          borderRadius: '10px',
+        },
+      });
     } catch (error: any) {
       toast.error(error.message || 'Failed to send reset email');
     } finally {
