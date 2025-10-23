@@ -1,4 +1,192 @@
-# Codebase Index - Multi-Tenant Fertilizer Inventory Management System
+# 📂 Codebase Index
+
+## 📁 Root Directory
+- `src/` – React/TS source code
+- `public/` – Static assets (images, videos)
+- `supabase/` – Supabase migrations & config
+- `vercel.json` – Vercel deployment config (SPA rewrite)
+- `vite.config.ts` – Vite build config (env handling)
+- `package.json` – Dependencies & scripts
+- `tsconfig.json` – TypeScript configuration (strict mode)
+- `tailwind.config.js` – Tailwind CSS configuration
+- `README.md` – Project overview and setup
+
+## 📂 src/
+### 📁 components/
+- **auth/** – Authentication UI
+  - `AuthPage.tsx` – Wrapper for login/signup
+  - `LoginForm.tsx` – Login form (glassmorphism)
+  - `SignUpForm.tsx` – Registration form
+  - `ForgotPasswordModal.tsx` – Password reset modal
+  - `ResetPasswordPage.tsx` – Reset password page
+- **admin/** – Admin portal (platform admin)
+  - `AdminLoginPage.tsx`
+  - `AdminDashboard.tsx`
+  - `PaymentManagementPage.tsx`
+- **dashboard/** – Main dashboard UI
+  - `Dashboard.tsx`
+  - `MuiDashboard.tsx`
+- **landing/** – Landing page & animations
+  - `LandingPageNew.tsx`
+  - `AdvancedAnimations.css`
+  - `HorizontalParallax.css`
+  - `useScrollAnimations.ts`
+- **legal/** – Legal pages
+  - `TermsAndConditions.tsx`
+  - `PrivacyPolicy.tsx`
+  - `RefundPolicy.tsx`
+- **pos/** – Point‑of‑sale
+  - `POSPage.tsx`
+  - `ModernPOSPage.tsx`
+  - `POSPage.css`
+  - `DualCopyInvoice.tsx`
+  - `BatchSelectionDialog.tsx`
+- **inventory/** – Stock management
+  - `StockMovementsPage.tsx`
+  - `StockTakePage.tsx`
+  - `BatchManagementPage.tsx`
+  - `ReorderAlertsPage.tsx`
+- **products/** – Product catalog UI
+- **categories/** – Category management UI
+- **customers/** – Customer management UI
+- **suppliers/** – Supplier management UI
+- **sales/** – Sales history UI
+- **purchases/** – Purchase order UI
+- **reports/** – Analytics & reporting UI
+- **settings/** – Business settings UI
+- **einvoice/** – E‑invoicing UI
+- **common/** – Shared components
+  - `NotFoundPage.tsx` – 404 page
+  - `FeatureAccessGuard.tsx`
+  - `SubscriptionBanner.tsx`
+- **hooks/** – Custom React hooks
+  - `useFeatureFlags.ts`
+  - `useSubscription.ts`
+  - `useSubscriptionAccess.ts`
+- **lib/** – Utility libraries
+  - `supabase.ts` – Supabase client & types
+  - `dashboardQueries.ts`
+  - `einvoiceGenerator.ts`
+  - `reactPdfGenerator.tsx`
+  - `reportPdfGenerator.tsx`
+  - `irpApiService.ts`
+  - `phonePeService.ts`
+  - `sentry.ts`
+- **utils/** – Helper functions
+  - `gstCalculations.ts`
+  - `invoiceTitles.ts`
+  - `securityValidation.ts`
+  - `debugStorage.ts`
+  - `supabaseDebug.ts`
+- **contexts/** – React context providers
+  - `AuthContext.tsx` – Auth state, profile, merchant loading
+- **types/** – TypeScript type definitions
+  - `database.ts` – Supabase generated types
+  - `index.ts` – App‑wide interfaces
+- `App.tsx` – Main router, theming, auth guard
+- `main.tsx` – Application entry point
+- `index.css` – Global Tailwind CSS imports
+
+## 📂 supabase/
+- `migrations/` – 45 SQL migration files (core schema, stock, subscription, GST, etc.)
+  - `20250101000002_corrected_full_schema.sql`
+  - `20250913000001-3_enhanced_stock_management.sql`
+  - `20250920000002_add_state_code_gst_logic.sql`
+  - `20251022000001_subscription_billing_system.sql`
+  - `20251022000002_payment_management_system.sql`
+  - `20251022000003_payment_storage_bucket.sql`
+  - `20251022000004_create_subscription_tables.sql`
+  - *(additional migrations for core tables, RLS policies, audit logs)*
+- `seed.sql` – Optional seed data for dev
+
+## 📂 docs/
+- `ENHANCED_STOCK_MANAGEMENT_INTEGRATION.md`
+- `PHONEPE_INTEGRATION_GUIDE.md`
+- `ADMIN_ACCESS_GUIDE.md`
+- `DEPLOYMENT_CHECKLIST.md`
+- `PRODUCTION_FIXES_SUMMARY.md`
+- *(many other markdown docs for features, guides, and fixes)*
+
+## 📂 public/
+- `Login_background.mp4` – Video background for auth pages
+- `phonepe-qr.png` – QR code for PhonePe integration
+- Other static assets (images, icons)
+
+## 🗂️ Important Config Files
+- `vercel.json` – SPA rewrite to `/index.html` for all routes (prevents 404 on refresh)
+- `vite.config.ts` – Vite build optimizations, env variable handling
+- `.env.example` – Template for environment variables (Supabase URL, keys, PhonePe credentials, etc.)
+- `package.json` – Scripts: `dev`, `build`, `preview`, `test`
+- `tsconfig.json` – Strict TypeScript settings
+- `tailwind.config.js` – Tailwind CSS customizations
+
+## 🛠️ Core Functionality
+- **Authentication** – Supabase Auth (email/password, password reset)
+- **Multi‑tenant RBAC** – `profiles.role` & `is_platform_admin` flags, Row‑Level Security policies
+- **Inventory Management** – Batch tracking, FEFO allocation, stock reservations, reorder alerts
+- **POS** – Real‑time stock updates, batch selection, GST‑compliant invoices, payment processing
+- **Subscription Billing** – Plans, trial periods, payment submissions, admin verification
+- **E‑invoicing** – IRP API integration, QR codes, digital signatures
+- **Admin Portal** – Payment verification, merchant management (future), analytics
+- **Feature Flags** – `useFeatureFlags` hook for controlled rollouts
+- **Security** – Rate limiting, audit logs, security headers, input validation
+
+## 📦 Dependencies (key)
+- `react`, `react-dom`, `react-router-dom`
+- `@supabase/supabase-js`
+- `@mui/material`, `@mui/icons-material`
+- `tailwindcss`, `postcss`, `autoprefixer`
+- `react-hook-form`, `zod`
+- `react-hot-toast`
+- `crypto-js`, `axios` (PhonePe integration)
+- `react-pdf`, `recharts`, `framer-motion`, `lottie-react`
+
+---
+
+# 📚 How to Navigate
+1. **Start at `src/App.tsx`** – See routing and auth flow.
+2. **Auth flow** – `AuthContext.tsx` provides `signIn`, `signUp`, `signOut`.
+3. **Admin vs User** – Role‑based routes in `App.tsx`.
+4. **Inventory** – Look at `src/components/inventory/` for batch & reorder logic.
+5. **POS** – `POSPage.tsx` and `BatchSelectionDialog.tsx` for FEFO.
+6. **Subscriptions** – `src/components/subscription/SubscriptionPage.tsx` and related hooks.
+7. **PhonePe** – `src/lib/phonePeService.ts` (placeholder) + docs.
+
+---
+
+# 🛠️ Common Tasks
+- **Add a new feature** – Create component under `src/components/`, add route in `App.tsx`.
+- **Add DB table** – Write migration in `supabase/migrations/`, run via Supabase UI.
+- **Add env var** – Update `.env.example` and Vercel project settings.
+- **Run locally** – `npm run dev` → http://localhost:5173
+- **Deploy** – Push to `main` → Vercel auto‑deploy.
+
+---
+
+# 📈 Project Health
+- **Tests:** None yet – consider adding Jest + React Testing Library.
+- **Linting:** ESLint + Prettier configured.
+- **Performance:** Code‑splitting, lazy loading, optimized Vite build.
+- **Security:** RLS, security headers, input sanitization.
+
+---
+
+# 🎯 Next Steps (Suggested)
+- ✅ Add unit tests for critical components (Auth, POS, Subscription).
+- ✅ Implement PhonePe full integration (replace placeholder).
+- ✅ Create admin merchant management UI.
+- ✅ Add CI pipeline for lint + type‑check.
+- ✅ Write migration for future features (e.g., stock transfer).
+
+---
+
+# 📜 License & Credits
+- MIT License (see LICENSE file)
+- Built with open‑source libraries listed in `package.json`.
+
+---
+
+*Generated by Cascade – your AI pair‑programmer.*
 
 **Generated:** October 22, 2025  
 **Tech Stack:** React 18 + TypeScript + Vite + Supabase + Material-UI + Tailwind CSS  

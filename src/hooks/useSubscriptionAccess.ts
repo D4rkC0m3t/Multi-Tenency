@@ -11,11 +11,12 @@ interface SubscriptionAccess {
   subscriptionEndDate: string | null;
   planType: string | null;
   loading: boolean;
+  refresh: () => Promise<void>;
 }
 
 export function useSubscriptionAccess(): SubscriptionAccess {
   const { merchant } = useAuth();
-  const [access, setAccess] = useState<SubscriptionAccess>({
+  const [access, setAccess] = useState<Omit<SubscriptionAccess, 'refresh'>>({
     hasAccess: true, // Default to true during loading
     isTrialActive: false,
     isTrialExpired: false,
@@ -39,13 +40,16 @@ export function useSubscriptionAccess(): SubscriptionAccess {
     try {
       if (!merchant?.id) return;
 
-      // Check for active subscription (use maybeSingle to avoid 406 error)
-      const { data: subscription, error: subError } = await supabase
+      // Check for active subscription (order by end_date to get the latest one)
+      const { data: subscriptions, error: subError } = await supabase
         .from('user_subscriptions')
         .select('*')
         .eq('merchant_id', merchant.id)
         .eq('status', 'active')
-        .maybeSingle();
+        .order('end_date', { ascending: false })
+        .limit(1);
+
+      const subscription = subscriptions && subscriptions.length > 0 ? subscriptions[0] : null;
 
       if (subscription && !subError) {
         // Has active subscription
@@ -86,11 +90,18 @@ export function useSubscriptionAccess(): SubscriptionAccess {
         planType: 'trial',
         loading: false,
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error checking subscription access:', error);
+      // Don't show error toast for 406 errors (handled by returning array)
+      if (error?.code !== 'PGRST116' && error?.status !== 406) {
+        console.warn('Subscription access check failed:', error.message);
+      }
       setAccess(prev => ({ ...prev, loading: false, hasAccess: false }));
     }
   };
 
-  return access;
+  return {
+    ...access,
+    refresh: checkSubscriptionAccess
+  };
 }

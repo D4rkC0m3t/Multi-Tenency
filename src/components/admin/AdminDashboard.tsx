@@ -1,57 +1,59 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
+import toast from 'react-hot-toast';
 import {
-  Shield,
   Users,
   CreditCard,
   TrendingUp,
-  AlertCircle,
   CheckCircle,
   XCircle,
   Clock,
   DollarSign,
-  Activity,
-  LogOut,
-  Settings,
   BarChart3,
-  FileText
+  ArrowRight,
+  Ban,
+  Pause,
+  Play,
+  RefreshCw,
+  Shield,
+  Settings,
 } from 'lucide-react';
-import toast from 'react-hot-toast';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
+import { Button } from '../ui/button';
+import { PatternAlert } from '../common/PatternAlert';
+import { RecentActivity } from '../common/RecentActivity';
 
-interface DashboardStats {
-  totalMerchants: number;
-  activeMerchants: number;
-  pendingPayments: number;
-  totalRevenue: number;
-  monthlyRevenue: number;
-  verifiedPayments: number;
-  rejectedPayments: number;
-}
+// Placeholder for 3D model (removed for simplicity)
 
-interface RecentActivity {
-  id: string;
-  type: string;
-  description: string;
-  timestamp: string;
-  status: string;
-}
+
+/* -------------------------------------------------
+   3D Skull Model Component
+   - Place a GLB file named `skull.glb` in the public folder.
+   - If missing, a simple fallback sphere is shown.
+------------------------------------------------- */
+// SkullModel removed; using static image instead
 
 export function AdminDashboard() {
-  const [stats, setStats] = useState<DashboardStats>({
-    totalMerchants: 0,
-    activeMerchants: 0,
-    pendingPayments: 0,
-    totalRevenue: 0,
-    monthlyRevenue: 0,
-    verifiedPayments: 0,
-    rejectedPayments: 0,
-  });
-  const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [adminProfile, setAdminProfile] = useState<any>(null);
   const navigate = useNavigate();
 
+const [stats, setStats] = useState({
+  totalMerchants: 0,
+  paymentsPending: 0,
+  merchantsRejected: 0,
+  totalRevenue: 0,
+  monthlyRevenue: 0,
+  verifiedPayments: 0,
+  rejectedPayments: 0,
+});
+const [recentActivity, setRecentActivity] = useState<any[]>([]);
+const [anomaly, setAnomaly] = useState<any>(null);
+const [loading, setLoading] = useState(true);
+
+
+  /* -------------------------------------------------
+     Fetch data on mount
+  ------------------------------------------------- */
   useEffect(() => {
     checkAdminAccess();
     fetchDashboardData();
@@ -60,27 +62,23 @@ export function AdminDashboard() {
   const checkAdminAccess = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      
       if (!user) {
         navigate('/admin/login');
         return;
       }
-
       const { data: profile } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', user.id)
         .single();
-
       if (!profile?.is_platform_admin && profile?.role !== 'super_admin') {
         toast.error('Access denied');
         navigate('/admin/login');
         return;
       }
-
-      setAdminProfile(profile);
-    } catch (error) {
-      console.error('Access check error:', error);
+      // profile is validated; no need to store locally
+    } catch (e) {
+      console.error(e);
       navigate('/admin/login');
     }
   };
@@ -88,324 +86,401 @@ export function AdminDashboard() {
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
+      // 1️⃣ Fetch aggregated KPI view
+      const { data: viewData, error: viewError } = await supabase
+        .from('merchant_actions')
+        .select('*')
+        .single();
+      if (viewError) throw viewError;
 
-      // Fetch merchants count
-      const { count: totalMerchants } = await supabase
-        .from('merchants')
-        .select('*', { count: 'exact', head: true });
-
-      // Fetch active subscriptions count
-      const { count: activeMerchants } = await supabase
-        .from('user_subscriptions')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'active');
-
-      // Fetch payment statistics
-      const { data: payments } = await supabase
+      // 2️⃣ Fetch revenue data (still from payments)
+      const { data: payments, error: payError } = await supabase
         .from('payment_submissions')
         .select('status, amount, created_at');
-
-      const pendingPayments = payments?.filter(p => p.status === 'pending').length || 0;
-      const verifiedPayments = payments?.filter(p => p.status === 'verified').length || 0;
-      const rejectedPayments = payments?.filter(p => p.status === 'rejected').length || 0;
-
-      // Calculate revenue
-      const totalRevenue = payments
-        ?.filter(p => p.status === 'verified')
+      if (payError) throw payError;
+      const totalRevenue = payments?.filter(p => p.status === 'verified')
         .reduce((sum, p) => sum + (p.amount || 0), 0) || 0;
+      const now = new Date();
+      const month = now.getMonth();
+      const year = now.getFullYear();
+      const monthlyRevenue = payments?.filter(p => {
+        const d = new Date(p.created_at);
+        return p.status === 'verified' && d.getMonth() === month && d.getFullYear() === year;
+      }).reduce((sum, p) => sum + (p.amount || 0), 0) || 0;
 
-      // Monthly revenue (current month)
-      const currentMonth = new Date().getMonth();
-      const currentYear = new Date().getFullYear();
-      const monthlyRevenue = payments
-        ?.filter(p => {
-          const paymentDate = new Date(p.created_at);
-          return p.status === 'verified' &&
-            paymentDate.getMonth() === currentMonth &&
-            paymentDate.getFullYear() === currentYear;
-        })
-        .reduce((sum, p) => sum + (p.amount || 0), 0) || 0;
-
-      // Fetch recent activity from audit log
-      const { data: auditLog } = await supabase
-        .from('payment_audit_log')
+      // 3️⃣ Recent merchant activity (audit log)
+      const { data: activityData, error: actError } = await supabase
+        .from('merchant_activity')
         .select('*')
         .order('created_at', { ascending: false })
-        .limit(10);
+        .limit(8);
+      if (actError) throw actError;
 
-      const activities: RecentActivity[] = auditLog?.map(log => ({
-        id: log.id,
-        type: log.action,
-        description: log.notes || 'Payment action',
-        timestamp: log.created_at,
-        status: log.action.includes('verified') ? 'success' : 'info'
-      })) || [];
+      // 4️⃣ Latest anomaly event (if any)
+      const { data: anomalyData, error: anError } = await supabase
+        .from('anomaly_events')
+        .select('*')
+        .order('detected_at', { ascending: false })
+        .limit(1);
+      if (anError) throw anError;
 
       setStats({
-        totalMerchants: totalMerchants || 0,
-        activeMerchants: activeMerchants || 0,
-        pendingPayments,
+        totalMerchants: viewData?.total_merchants || 0,
+        paymentsPending: viewData?.payments_pending || 0,
+        merchantsRejected: viewData?.merchants_rejected || 0,
         totalRevenue,
         monthlyRevenue,
-        verifiedPayments,
-        rejectedPayments,
+        verifiedPayments: payments?.filter(p => p.status === 'verified').length || 0,
+        rejectedPayments: payments?.filter(p => p.status === 'rejected').length || 0,
       });
-
-      setRecentActivity(activities);
-    } catch (error) {
-      console.error('Error fetching dashboard data:', error);
-      toast.error('Failed to load dashboard data');
+      setRecentActivity(activityData || []);
+      setAnomaly(anomalyData && anomalyData.length > 0 ? anomalyData[0] : null);
+    } catch (e) {
+      console.error(e);
+      toast.error('Failed to load dashboard');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleLogout = async () => {
-    try {
-      await supabase.auth.signOut();
-      toast.success('Logged out successfully');
-      navigate('/admin/login');
-    } catch (error) {
-      console.error('Logout error:', error);
-      toast.error('Failed to logout');
-    }
-  };
+  // logout handled by AdminLayout
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR',
-      maximumFractionDigits: 0,
-    }).format(amount);
-  };
+  const formatCurrency = (amount: number) =>
+    new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(amount);
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString('en-IN', {
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
+  // Date formatting is handled inside RecentActivity component. Recent activity type is defined in the RecentActivity component.
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-purple-500/30 border-t-purple-500 rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-white text-lg">Loading admin dashboard...</p>
+      <div className="min-h-screen flex items-center justify-center bg-gray-900">
+        <div className="text-center text-white">
+          <div className="w-16 h-16 border-4 border-orange-500 rounded-full animate-spin mx-auto mb-4"></div>
+          <p>Loading admin dashboard…</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
+    <div className="p-8 space-y-6">
+      {/* Optional anomaly banner */}
+      {anomaly && (
+        <PatternAlert
+          title={anomaly.title}
+          description={anomaly.description}
+          severity={anomaly.severity}
+        />
+      )}
+
       {/* Header */}
-      <header className="bg-black/20 backdrop-blur-xl border-b border-white/10 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
+      <div>
+        <h1 className="text-3xl font-bold">Admin Dashboard</h1>
+        <p className="text-muted-foreground mt-1">Monitor and manage your platform</p>
+      </div>
+
+      {/* KPI cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Total Merchants</CardTitle>
+            <Users className="w-5 h-5 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold">{stats.totalMerchants}</div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
+            <DollarSign className="w-5 h-5 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{formatCurrency(stats.totalRevenue)}</div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">This Month</CardTitle>
+            <TrendingUp className="w-5 h-5 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{formatCurrency(stats.monthlyRevenue)}</div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Action cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <Card>
+          <CardHeader>
             <div className="flex items-center gap-3">
-              <div className="bg-gradient-to-br from-purple-500 to-blue-600 p-2 rounded-lg">
-                <Shield className="w-6 h-6 text-white" />
+              <div className="p-3 bg-muted rounded-lg">
+                <CreditCard className="w-6 h-6" />
               </div>
               <div>
-                <h1 className="text-xl font-bold text-white">Admin Dashboard</h1>
-                <p className="text-sm text-gray-400">Platform Administration</p>
+                <CardTitle>Approve Payments</CardTitle>
+                <CardDescription>Pending payments: {stats.paymentsPending}</CardDescription>
               </div>
             </div>
-            <div className="flex items-center gap-4">
-              <div className="text-right mr-4">
-                <p className="text-sm text-white font-medium">{adminProfile?.full_name}</p>
-                <p className="text-xs text-gray-400">{adminProfile?.email}</p>
+          </CardHeader>
+          <CardContent>
+            <Button onClick={() => navigate('/admin/payments')} className="w-full">
+              Go to Payments <ArrowRight className="w-4 h-4 ml-2" />
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-muted rounded-lg">
+                <Users className="w-6 h-6" />
               </div>
-              <button
-                onClick={handleLogout}
-                className="flex items-center gap-2 px-4 py-2 bg-red-500/20 text-red-300 rounded-lg hover:bg-red-500/30 transition-colors"
-              >
-                <LogOut className="w-4 h-4" />
-                <span>Logout</span>
-              </button>
+              <div>
+                <CardTitle>Manage Merchants</CardTitle>
+                <CardDescription>Total merchants: {stats.totalMerchants}</CardDescription>
+              </div>
             </div>
+          </CardHeader>
+          <CardContent>
+            <Button onClick={() => navigate('/admin/merchants')} className="w-full">
+              Go to Merchants <ArrowRight className="w-4 h-4 ml-2" />
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-muted rounded-lg">
+                <BarChart3 className="w-6 h-6" />
+              </div>
+              <div>
+                <CardTitle>Reports</CardTitle>
+                <CardDescription>View analytics and trends</CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <Button onClick={() => navigate('/admin/reports')} className="w-full">
+              View Reports <ArrowRight className="w-4 h-4 ml-2" />
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Recent Activity */}
+      <RecentActivity activities={recentActivity} onRefresh={fetchDashboardData} />
+
+      {/* Payment status overview */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Verified</CardTitle>
+            <CheckCircle className="w-5 h-5 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold">{stats.verifiedPayments}</div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Pending</CardTitle>
+            <Clock className="w-5 h-5 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold">{stats.paymentsPending}</div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Rejected</CardTitle>
+            <XCircle className="w-5 h-5 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold">{stats.merchantsRejected}</div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Manual Controls Section */}
+      <Card className="border-orange-500/20">
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Shield className="w-5 h-5 text-orange-500" />
+            <CardTitle>Manual Controls</CardTitle>
           </div>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          {/* Total Merchants */}
-          <div className="bg-white/10 backdrop-blur-xl rounded-xl p-6 border border-white/20">
-            <div className="flex items-center justify-between mb-4">
-              <div className="bg-blue-500/20 p-3 rounded-lg">
-                <Users className="w-6 h-6 text-blue-400" />
-              </div>
-              <span className="text-2xl font-bold text-white">{stats.totalMerchants}</span>
-            </div>
-            <h3 className="text-gray-300 text-sm font-medium">Total Merchants</h3>
-            <p className="text-gray-400 text-xs mt-1">{stats.activeMerchants} active subscriptions</p>
-          </div>
-
-          {/* Pending Payments */}
-          <div className="bg-white/10 backdrop-blur-xl rounded-xl p-6 border border-white/20">
-            <div className="flex items-center justify-between mb-4">
-              <div className="bg-yellow-500/20 p-3 rounded-lg">
-                <Clock className="w-6 h-6 text-yellow-400" />
-              </div>
-              <span className="text-2xl font-bold text-white">{stats.pendingPayments}</span>
-            </div>
-            <h3 className="text-gray-300 text-sm font-medium">Pending Payments</h3>
-            <p className="text-gray-400 text-xs mt-1">Awaiting verification</p>
-          </div>
-
-          {/* Total Revenue */}
-          <div className="bg-white/10 backdrop-blur-xl rounded-xl p-6 border border-white/20">
-            <div className="flex items-center justify-between mb-4">
-              <div className="bg-green-500/20 p-3 rounded-lg">
-                <DollarSign className="w-6 h-6 text-green-400" />
-              </div>
-              <span className="text-2xl font-bold text-white">{formatCurrency(stats.totalRevenue)}</span>
-            </div>
-            <h3 className="text-gray-300 text-sm font-medium">Total Revenue</h3>
-            <p className="text-gray-400 text-xs mt-1">{stats.verifiedPayments} verified payments</p>
-          </div>
-
-          {/* Monthly Revenue */}
-          <div className="bg-white/10 backdrop-blur-xl rounded-xl p-6 border border-white/20">
-            <div className="flex items-center justify-between mb-4">
-              <div className="bg-purple-500/20 p-3 rounded-lg">
-                <TrendingUp className="w-6 h-6 text-purple-400" />
-              </div>
-              <span className="text-2xl font-bold text-white">{formatCurrency(stats.monthlyRevenue)}</span>
-            </div>
-            <h3 className="text-gray-300 text-sm font-medium">This Month</h3>
-            <p className="text-gray-400 text-xs mt-1">Current month revenue</p>
-          </div>
-        </div>
-
-        {/* Quick Actions */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <button
-            onClick={() => navigate('/admin/payments')}
-            className="bg-white/10 backdrop-blur-xl rounded-xl p-6 border border-white/20 hover:bg-white/20 transition-all group"
-          >
-            <div className="flex items-center gap-4">
-              <div className="bg-purple-500/20 p-4 rounded-lg group-hover:bg-purple-500/30 transition-colors">
-                <CreditCard className="w-8 h-8 text-purple-400" />
-              </div>
-              <div className="text-left">
-                <h3 className="text-white font-semibold text-lg">Manage Payments</h3>
-                <p className="text-gray-400 text-sm">Verify & process payments</p>
-              </div>
-            </div>
-          </button>
-
-          <button
-            onClick={() => navigate('/admin/merchants')}
-            className="bg-white/10 backdrop-blur-xl rounded-xl p-6 border border-white/20 hover:bg-white/20 transition-all group"
-          >
-            <div className="flex items-center gap-4">
-              <div className="bg-blue-500/20 p-4 rounded-lg group-hover:bg-blue-500/30 transition-colors">
-                <Users className="w-8 h-8 text-blue-400" />
-              </div>
-              <div className="text-left">
-                <h3 className="text-white font-semibold text-lg">Merchants</h3>
-                <p className="text-gray-400 text-sm">View all merchants</p>
-              </div>
-            </div>
-          </button>
-
-          <button
-            onClick={() => navigate('/admin/reports')}
-            className="bg-white/10 backdrop-blur-xl rounded-xl p-6 border border-white/20 hover:bg-white/20 transition-all group"
-          >
-            <div className="flex items-center gap-4">
-              <div className="bg-green-500/20 p-4 rounded-lg group-hover:bg-green-500/30 transition-colors">
-                <BarChart3 className="w-8 h-8 text-green-400" />
-              </div>
-              <div className="text-left">
-                <h3 className="text-white font-semibold text-lg">Reports</h3>
-                <p className="text-gray-400 text-sm">Analytics & insights</p>
-              </div>
-            </div>
-          </button>
-        </div>
-
-        {/* Recent Activity */}
-        <div className="bg-white/10 backdrop-blur-xl rounded-xl border border-white/20 p-6">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-bold text-white flex items-center gap-2">
-              <Activity className="w-5 h-5" />
-              Recent Activity
-            </h2>
-            <button className="text-purple-400 hover:text-purple-300 text-sm font-medium">
-              View All
-            </button>
-          </div>
-
-          <div className="space-y-4">
-            {recentActivity.length > 0 ? (
-              recentActivity.map((activity) => (
-                <div
-                  key={activity.id}
-                  className="flex items-center gap-4 p-4 bg-white/5 rounded-lg border border-white/10"
+          <CardDescription>Quick actions for payment and account management</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* Payment Controls */}
+            <div className="space-y-3">
+              <h3 className="text-sm font-semibold text-muted-foreground flex items-center gap-2">
+                <CreditCard className="w-4 h-4" />
+                Payment Controls
+              </h3>
+              <div className="space-y-2">
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-start"
+                  onClick={() => navigate('/admin/payments?filter=pending')}
                 >
-                  <div className={`p-2 rounded-lg ${
-                    activity.status === 'success' ? 'bg-green-500/20' : 'bg-blue-500/20'
-                  }`}>
-                    {activity.status === 'success' ? (
-                      <CheckCircle className="w-5 h-5 text-green-400" />
-                    ) : (
-                      <Activity className="w-5 h-5 text-blue-400" />
-                    )}
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-white font-medium">{activity.type}</p>
-                    <p className="text-gray-400 text-sm">{activity.description}</p>
-                  </div>
-                  <span className="text-gray-400 text-sm">{formatDate(activity.timestamp)}</span>
-                </div>
-              ))
-            ) : (
-              <div className="text-center py-8">
-                <FileText className="w-12 h-12 text-gray-600 mx-auto mb-3" />
-                <p className="text-gray-400">No recent activity</p>
+                  <Clock className="w-4 h-4 mr-2" />
+                  Review Pending ({stats.paymentsPending})
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-start"
+                  onClick={() => {
+                    if (confirm('Refresh payment data from database?')) {
+                      fetchDashboardData();
+                      toast.success('Payment data refreshed');
+                    }
+                  }}
+                >
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                  Refresh Payments
+                </Button>
               </div>
-            )}
-          </div>
-        </div>
-
-        {/* Payment Status Overview */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8">
-          <div className="bg-green-500/10 backdrop-blur-xl rounded-xl p-6 border border-green-500/20">
-            <div className="flex items-center gap-3 mb-3">
-              <CheckCircle className="w-6 h-6 text-green-400" />
-              <h3 className="text-white font-semibold">Verified</h3>
             </div>
-            <p className="text-3xl font-bold text-green-400">{stats.verifiedPayments}</p>
-            <p className="text-gray-400 text-sm mt-1">Approved payments</p>
+
+            {/* Account Controls */}
+            <div className="space-y-3">
+              <h3 className="text-sm font-semibold text-muted-foreground flex items-center gap-2">
+                <Users className="w-4 h-4" />
+                Account Controls
+              </h3>
+              <div className="space-y-2">
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-start"
+                  onClick={() => navigate('/admin/merchants')}
+                >
+                  <Settings className="w-4 h-4 mr-2" />
+                  Manage Accounts
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-start text-yellow-600 hover:text-yellow-700"
+                  onClick={() => {
+                    toast('Account pause feature - Navigate to merchant details to pause individual accounts', {
+                      icon: '⚠️',
+                      duration: 3000,
+                    });
+                    navigate('/admin/merchants');
+                  }}
+                >
+                  <Pause className="w-4 h-4 mr-2" />
+                  Pause Account
+                </Button>
+              </div>
+            </div>
+
+            {/* Subscription Controls */}
+            <div className="space-y-3">
+              <h3 className="text-sm font-semibold text-muted-foreground flex items-center gap-2">
+                <Play className="w-4 h-4" />
+                Subscription Controls
+              </h3>
+              <div className="space-y-2">
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-start text-green-600 hover:text-green-700"
+                  onClick={() => {
+                    toast('Activate subscription - Verify payment first in Payments page', {
+                      icon: '✅',
+                      duration: 3000,
+                    });
+                    navigate('/admin/payments');
+                  }}
+                >
+                  <Play className="w-4 h-4 mr-2" />
+                  Activate Subscription
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-start"
+                  onClick={() => {
+                    toast('View subscription details in Merchants page', {
+                      icon: 'ℹ️',
+                      duration: 3000,
+                    });
+                    navigate('/admin/merchants');
+                  }}
+                >
+                  <CheckCircle className="w-4 h-4 mr-2" />
+                  View Subscriptions
+                </Button>
+              </div>
+            </div>
+
+            {/* Security Controls */}
+            <div className="space-y-3">
+              <h3 className="text-sm font-semibold text-muted-foreground flex items-center gap-2">
+                <Ban className="w-4 h-4" />
+                Security Controls
+              </h3>
+              <div className="space-y-2">
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-start text-red-600 hover:text-red-700"
+                  onClick={() => {
+                    toast('Ban account - Navigate to merchant details to ban individual accounts', {
+                      icon: '🚫',
+                      duration: 3000,
+                    });
+                    navigate('/admin/merchants');
+                  }}
+                >
+                  <Ban className="w-4 h-4 mr-2" />
+                  Ban Account
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-start"
+                  onClick={() => {
+                    if (confirm('Refresh all dashboard data?')) {
+                      fetchDashboardData();
+                      toast.success('Dashboard refreshed');
+                    }
+                  }}
+                >
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                  Refresh Dashboard
+                </Button>
+              </div>
+            </div>
           </div>
 
-          <div className="bg-yellow-500/10 backdrop-blur-xl rounded-xl p-6 border border-yellow-500/20">
-            <div className="flex items-center gap-3 mb-3">
-              <Clock className="w-6 h-6 text-yellow-400" />
-              <h3 className="text-white font-semibold">Pending</h3>
+          {/* Quick Stats */}
+          <div className="mt-6 pt-6 border-t">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+              <div>
+                <div className="text-2xl font-bold text-green-500">{stats.verifiedPayments}</div>
+                <div className="text-xs text-muted-foreground">Verified Payments</div>
+              </div>
+              <div>
+                <div className="text-2xl font-bold text-yellow-500">{stats.paymentsPending}</div>
+                <div className="text-xs text-muted-foreground">Pending Review</div>
+              </div>
+              <div>
+                <div className="text-2xl font-bold">{stats.totalMerchants}</div>
+                <div className="text-xs text-muted-foreground">Total Merchants</div>
+              </div>
+              <div>
+                <div className="text-2xl font-bold text-blue-500">{formatCurrency(stats.totalRevenue)}</div>
+                <div className="text-xs text-muted-foreground">Total Revenue</div>
+              </div>
             </div>
-            <p className="text-3xl font-bold text-yellow-400">{stats.pendingPayments}</p>
-            <p className="text-gray-400 text-sm mt-1">Awaiting review</p>
           </div>
-
-          <div className="bg-red-500/10 backdrop-blur-xl rounded-xl p-6 border border-red-500/20">
-            <div className="flex items-center gap-3 mb-3">
-              <XCircle className="w-6 h-6 text-red-400" />
-              <h3 className="text-white font-semibold">Rejected</h3>
-            </div>
-            <p className="text-3xl font-bold text-red-400">{stats.rejectedPayments}</p>
-            <p className="text-gray-400 text-sm mt-1">Declined payments</p>
-          </div>
-        </div>
-      </main>
+        </CardContent>
+      </Card>
     </div>
   );
+
 }

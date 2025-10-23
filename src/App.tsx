@@ -28,6 +28,10 @@ import { SubscriptionPage } from './components/subscription/SubscriptionPage';
 import { PaymentManagementPage } from './components/admin/PaymentManagementPage';
 import { AdminLoginPage } from './components/admin/AdminLoginPage';
 import { AdminDashboard } from './components/admin/AdminDashboard';
+import { AdminLayout } from './components/layout/AdminLayout';
+import { MerchantsPage } from './components/admin/MerchantsPage';
+import { MerchantDetailPage } from './components/admin/MerchantDetailPage';
+import { ReportsPage as AdminReportsPage } from './components/admin/ReportsPage';
 import TermsAndConditions from './components/legal/TermsAndConditions';
 import PrivacyPolicy from './components/legal/PrivacyPolicy';
 import RefundPolicy from './components/legal/RefundPolicy';
@@ -42,8 +46,12 @@ function AppContent() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
+      <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto mb-4"></div>
+          <p className="text-gray-700 font-medium">Loading your dashboard...</p>
+          <p className="text-gray-500 text-sm mt-2">Please wait</p>
+        </div>
       </div>
     );
   }
@@ -72,6 +80,7 @@ function AppContent() {
         <div className="app-container">
           <Routes>
             <Route path="/" element={<LandingPage />} />
+            <Route path="/landing" element={<LandingPage />} />
             <Route path="/login" element={<AuthPage />} />
             <Route path="/auth" element={<AuthPage />} />
             <Route path="/reset-password" element={<ResetPasswordPage />} />
@@ -79,7 +88,8 @@ function AppContent() {
             <Route path="/terms" element={<TermsAndConditions />} />
             <Route path="/privacy" element={<PrivacyPolicy />} />
             <Route path="/refund" element={<RefundPolicy />} />
-            <Route path="*" element={<NotFoundPage />} />
+            {/* Redirect all protected routes to login instead of showing 404 */}
+            <Route path="*" element={<Navigate to="/auth" replace />} />
           </Routes>
           <Toaster position="top-right" />
         </div>
@@ -139,15 +149,20 @@ function AppContent() {
             <Route path="notifications" element={<NotificationsPage />} />
             <Route path="settings" element={<SettingsPage />} />
             <Route path="subscription" element={<SubscriptionPage />} />
-            <Route path="admin/payments" element={<PaymentManagementPage />} />
             <Route path="terms" element={<TermsAndConditions />} />
             <Route path="privacy" element={<PrivacyPolicy />} />
             <Route path="refund" element={<RefundPolicy />} />
           </Route>
 
-          {/* Admin Routes (outside Layout) */}
-          <Route path="/admin/dashboard" element={<AdminDashboard />} />
+          {/* Admin Routes with Layout */}
           <Route path="/admin/login" element={<AdminLoginPage />} />
+          <Route path="/admin" element={<AdminLayout />}>
+            <Route path="dashboard" element={<AdminDashboard />} />
+            <Route path="payments" element={<PaymentManagementPage />} />
+            <Route path="merchants" element={<MerchantsPage />} />
+            <Route path="merchants/:merchantId" element={<MerchantDetailPage />} />
+            <Route path="reports" element={<AdminReportsPage />} />
+          </Route>
           
           {/* 404 Not Found - Catch all unknown routes */}
           <Route path="*" element={<NotFoundPage />} />

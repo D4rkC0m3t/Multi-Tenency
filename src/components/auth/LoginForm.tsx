@@ -50,6 +50,8 @@ export function LoginForm({ onToggleToSignup }: LoginFormProps) {
     try {
       setLoading(true);
       await signIn(data.email, data.password);
+      // Navigate to dashboard after successful login
+      navigate('/dashboard');
     } catch (error: any) {
       toast.error(error.message || 'Failed to sign in');
     } finally {
